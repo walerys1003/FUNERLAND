@@ -4,9 +4,9 @@ import tasksPlan from '@/lib/tasks-plan.json';
 import agentsConfig from '../../../orchestrator/agents.config.json';
 
 export const metadata: Metadata = {
-  title: 'Orchestrator AI · 6 agentów · 500 tasków · Polskie Pogrzeby',
+  title: 'Orchestrator AI · 11 agentów · 1000 tasków (Phase 3) · Polskie Pogrzeby',
   description:
-    'System multi-agent orchestrator: 6 wyspecjalizowanych agentów AI pracujących równolegle nad 500 taskami: Builder, Designer, Content, Outreach, SEO, GTM.',
+    'System multi-agent orchestrator Phase 3: 11 wyspecjalizowanych agentów AI pracujących równolegle nad 1000 taskami: Builder, Designer, Content, Outreach, SEO, GTM, Search, Marketplace, AI, DevOps, QA.',
 };
 
 export default function OrchestratorPage() {

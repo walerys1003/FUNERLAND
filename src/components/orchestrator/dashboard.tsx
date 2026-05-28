@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Server,
   Bot,
+  TestTube,
   Play,
   Pause,
   RotateCcw,
@@ -62,6 +63,7 @@ const ICONS: Record<string, any> = {
   Sparkles,
   Server,
   Bot,
+  TestTube,
 };
 
 export default function OrchestratorDashboard({

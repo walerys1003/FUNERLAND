@@ -1,0 +1,1 @@
+Dzień dobry {Imię}. Piszę z Polskie Pogrzeby. Mamy 47 zapytań rodzin miesięcznie z {miasto} szukających firmy pogrzebowej. Czy mogę zadzwonić w 5 min sprawdzić, czy {nazwa_firmy} mogłoby je obsłużyć? Odpisz TAK / NIE / KIEDY (godzina). {Imię_handlowca}

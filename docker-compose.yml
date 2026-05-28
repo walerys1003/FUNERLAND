@@ -1,0 +1,270 @@
+# PolskiePogrzeby.pl — Production docker-compose
+# Stack: Next.js + Supabase self-hosted + Meilisearch + Redis + MinIO + Traefik
+# Usage:
+#   docker compose --env-file .env.production up -d
+#
+# IMPORTANT: this file is opinionated for a single-server (Hetzner CCX23 / Contabo VDS L)
+# Coolify install. For multi-node, switch to Docker Swarm or K3s.
+
+version: "3.9"
+
+networks:
+  public:
+    external: true       # provided by Coolify/Traefik
+  internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  meili-data:
+  redis-data:
+  minio-data:
+  storage-data:
+
+services:
+  # ============== NEXT.JS APP ==============
+  app:
+    image: ghcr.io/walerys1003/funerland:latest
+    container_name: pp-app
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      - postgres
+      - meilisearch
+      - redis
+    networks:
+      - public
+      - internal
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=Host(`polskiepogrzeby.pl`) || Host(`www.polskiepogrzeby.pl`)
+      - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls.certresolver=letsencrypt
+      - traefik.http.services.app.loadbalancer.server.port=3000
+      - traefik.http.middlewares.app-redirect-www.redirectregex.regex=^https://www\.polskiepogrzeby\.pl/(.*)
+      - traefik.http.middlewares.app-redirect-www.redirectregex.replacement=https://polskiepogrzeby.pl/$$1
+      - traefik.http.routers.app.middlewares=app-redirect-www
+
+  # ============== POSTGRES (Supabase) ==============
+  postgres:
+    image: supabase/postgres:15.1.0.117
+    container_name: pp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: 3600
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./supabase/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./supabase/rls.sql:/docker-entrypoint-initdb.d/02-rls.sql:ro
+      - ./supabase/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============== SUPABASE AUTH (GoTrue) ==============
+  auth:
+    image: supabase/gotrue:v2.158.0
+    container_name: pp-auth
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres?sslmode=disable
+      GOTRUE_SITE_URL: https://polskiepogrzeby.pl
+      GOTRUE_URI_ALLOW_LIST: https://polskiepogrzeby.pl,https://www.polskiepogrzeby.pl
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: smtp.resend.com
+      GOTRUE_SMTP_PORT: 587
+      GOTRUE_SMTP_USER: resend
+      GOTRUE_SMTP_PASS: ${RESEND_API_KEY}
+      GOTRUE_SMTP_SENDER_NAME: PolskiePogrzeby.pl
+      GOTRUE_SMTP_ADMIN_EMAIL: hello@polskiepogrzeby.pl
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: "true"
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: ${GOOGLE_CLIENT_SECRET}
+    networks:
+      - internal
+
+  # ============== POSTGREST ==============
+  postgrest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: pp-postgrest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    networks:
+      - internal
+
+  # ============== REALTIME ==============
+  realtime:
+    image: supabase/realtime:v2.30.34
+    container_name: pp-realtime
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_ENC_KEY: ${DB_ENC_KEY}
+      API_JWT_SECRET: ${JWT_SECRET}
+      FLY_ALLOC_ID: pp-realtime
+      FLY_APP_NAME: realtime
+      SECRET_KEY_BASE: ${REALTIME_SECRET}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      ENABLE_TAILSCALE: "false"
+      DNS_NODES: "''"
+    networks:
+      - internal
+
+  # ============== STORAGE ==============
+  storage:
+    image: supabase/storage-api:v1.11.13
+    container_name: pp-storage
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://postgrest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: polskiepogrzeby-media
+      GLOBAL_S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: eu-central-1
+      AWS_DEFAULT_REGION: eu-central-1
+      TENANT_ID: pp
+      REGION: eu-central-1
+    volumes:
+      - storage-data:/var/lib/storage
+    networks:
+      - internal
+
+  # ============== KONG (API gateway, optional) ==============
+  kong:
+    image: kong:2.8.1
+    container_name: pp-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+    volumes:
+      - ./infra/kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - public
+      - internal
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`api.polskiepogrzeby.pl`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls.certresolver=letsencrypt
+      - traefik.http.services.api.loadbalancer.server.port=8000
+
+  # ============== MEILISEARCH ==============
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: pp-meili
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_LOG_LEVEL: WARN
+    volumes:
+      - meili-data:/meili_data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 30s
+      retries: 3
+
+  # ============== REDIS ==============
+  redis:
+    image: redis:7-alpine
+    container_name: pp-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+
+  # ============== MINIO (S3) ==============
+  minio:
+    image: minio/minio:RELEASE.2024-08-17T01-24-54Z
+    container_name: pp-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    networks:
+      - internal
+      - public
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio.rule=Host(`s3.polskiepogrzeby.pl`)
+      - traefik.http.routers.minio.entrypoints=websecure
+      - traefik.http.routers.minio.tls.certresolver=letsencrypt
+      - traefik.http.services.minio.loadbalancer.server.port=9000
+
+  # ============== CRON WORKERS ==============
+  worker-meili-sync:
+    image: ghcr.io/walerys1003/funerland-worker:latest
+    container_name: pp-worker-meili
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      - postgres
+      - meilisearch
+      - redis
+    command: ["node", "workers/meili-sync.mjs"]
+    networks:
+      - internal
+
+  worker-email-queue:
+    image: ghcr.io/walerys1003/funerland-worker:latest
+    container_name: pp-worker-email
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      - postgres
+      - redis
+    command: ["node", "workers/email-queue.mjs"]
+    networks:
+      - internal

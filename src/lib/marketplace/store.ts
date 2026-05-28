@@ -69,10 +69,16 @@ type Review = {
   authorEmail: string;
   verified: boolean;
   bookingNumber?: string;
-  status: 'pending' | 'published' | 'rejected';
+  status: 'pending' | 'published' | 'rejected' | 'flagged';
   createdAt: string;
   publishedAt?: string;
   reply?: { body: string; createdAt: string };
+  /** Agent 6: auto-moderation result attached at submission time. */
+  moderation?: {
+    decision: 'approve' | 'review' | 'reject';
+    topScore: number;
+    flags: { reason: string; score: number; matchedTerms?: string[]; excerpt?: string }[];
+  };
 };
 
 type Obituary = {
@@ -268,8 +274,25 @@ export const reviewStore = {
   },
   pending(limit = 20) {
     return store
-      .list(store.reviews, (r) => r.status === 'pending')
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .list(store.reviews, (r) => r.status === 'pending' || r.status === 'flagged')
+      .sort((a, b) => {
+        // flagged first (top moderation score), then by created_at desc
+        const ad = a.status === 'flagged' ? (a.moderation?.topScore || 0) : 0;
+        const bd = b.status === 'flagged' ? (b.moderation?.topScore || 0) : 0;
+        if (ad !== bd) return bd - ad;
+        return b.createdAt.localeCompare(a.createdAt);
+      })
+      .slice(0, limit);
+  },
+  /** Agent 6: list only auto-flagged reviews (highest moderation score first). */
+  flagged(limit = 50) {
+    return store
+      .list(store.reviews, (r) => r.status === 'flagged')
+      .sort(
+        (a, b) =>
+          (b.moderation?.topScore || 0) - (a.moderation?.topScore || 0) ||
+          b.createdAt.localeCompare(a.createdAt),
+      )
       .slice(0, limit);
   },
   recent(limit = 20) {

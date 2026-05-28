@@ -2,19 +2,10 @@ import { NextResponse } from 'next/server';
 import { reviewRepo, bookingRepo } from '@/lib/marketplace/repo';
 import { reviewStore } from '@/lib/marketplace/store';
 import { requireRole } from '@/lib/auth/session';
+import { moderateText, reasonLabel } from '@/lib/moderation/heuristics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-function spamScore(text: string): number {
-  let score = 0;
-  const flags = ['kup', 'tani', 'klik', 'zniżk', 'darmow', 'www.', 'http://', 'https://'];
-  for (const f of flags) if (text.toLowerCase().includes(f)) score += 0.2;
-  const capsRatio = (text.match(/[A-Z]/g)?.length || 0) / Math.max(text.length, 1);
-  if (capsRatio > 0.3) score += 0.3;
-  if (/(.)\1{4,}/.test(text)) score += 0.3;
-  return Math.min(score, 1);
-}
 
 // GET /api/reviews?company=zaklad-kalla
 export async function GET(req: Request) {
@@ -53,11 +44,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Wymagana zgoda RODO' }, { status: 400 });
     }
 
-    // Spam guard
-    const spam = spamScore(`${data.title} ${data.body}`);
-    if (spam > 0.8) {
+    // Moderation AI (Agent 6) — analyze combined text
+    const moderation = moderateText(`${data.title}\n${data.body}`);
+    if (moderation.decision === 'reject') {
+      const reasons = moderation.flags.map((f) => reasonLabel(f.reason)).join(', ');
       return NextResponse.json(
-        { error: 'Opinia wygląda jak spam — sprawdź treść.' },
+        {
+          error: `Opinia nie przeszła moderacji (${reasons}). Spróbuj zmienić treść.`,
+          moderation,
+        },
         { status: 400 },
       );
     }
@@ -75,15 +70,28 @@ export async function POST(req: Request) {
       authorName: String(data.authorName).slice(0, 120),
       authorEmail: data.authorEmail,
       bookingNumber: data.bookingNumber,
+      moderation,
     });
 
     if (!review) return NextResponse.json({ error: 'Firma nie istnieje' }, { status: 404 });
+
+    // If moderation flagged for review, ensure status reflects that:
+    //   - was 'published' → demote to 'flagged' (auto-flagged, needs admin look)
+    //   - was 'pending'   → upgrade to 'flagged' so admin queue surfaces it first
+    if (moderation.decision === 'review') {
+      (review as any).status = 'flagged';
+    }
+
     return NextResponse.json({
       ok: true,
       review,
-      message: review.status === 'published'
-        ? 'Dziękujemy za opinię. Została opublikowana.'
-        : 'Dziękujemy za opinię. Po krótkiej weryfikacji pojawi się publicznie.',
+      moderation,
+      message:
+        review.status === 'published'
+          ? 'Dziękujemy za opinię. Została opublikowana.'
+          : moderation.decision === 'review'
+            ? 'Dziękujemy. Opinia oczekuje na moderację (wykryto potencjalne problemy).'
+            : 'Dziękujemy za opinię. Po krótkiej weryfikacji pojawi się publicznie.',
     });
   } catch (e: any) {
     console.error('Review submit error:', e);

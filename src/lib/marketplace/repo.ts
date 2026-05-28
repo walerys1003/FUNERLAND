@@ -254,6 +254,11 @@ export const reviewRepo = {
     authorName: string;
     authorEmail: string;
     bookingNumber?: string;
+    moderation?: {
+      decision: 'approve' | 'review' | 'reject';
+      topScore: number;
+      flags: { reason: string; score: number; matchedTerms?: string[]; excerpt?: string }[];
+    };
   }): Promise<Review | null> {
     if (!USE_SUPABASE) return reviewStore.submit(r) as Review;
     const { data: c } = await admin().from('companies').select('id').eq('slug', r.companySlug).maybeSingle();

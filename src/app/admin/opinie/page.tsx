@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { Star, MessageSquare } from 'lucide-react';
+import { Star, MessageSquare, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { checkAdminAccess } from '@/lib/auth/admin-guard';
 import { reviewStore } from '@/lib/marketplace/store';
+import { reasonLabel } from '@/lib/moderation/heuristics';
 import ModerationActions from '../moderation-actions';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +13,10 @@ export default async function AdminOpiniePage() {
   if (!access.allowed) return access.node;
 
   const pending = reviewStore.pending(50);
+  const flaggedOnly = pending.filter((r) => r.status === 'flagged');
 
-  // All reviews (rough scan via known companies) — for stats
-  // We don't have a global list, but pending list is enough for moderation view.
   const total = pending.length;
+  const flaggedCount = flaggedOnly.length;
 
   return (
     <div className="p-6 md:p-10">
@@ -34,9 +35,29 @@ export default async function AdminOpiniePage() {
           )}
           <div className="text-[12.5px] text-text-secondary">
             <span className="font-semibold text-navy">{total}</span> w kolejce
+            {flaggedCount > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
+                <ShieldAlert className="w-3 h-3" />
+                {flaggedCount} auto-flag
+              </span>
+            )}
           </div>
         </div>
       </div>
+
+      {flaggedCount > 0 && (
+        <div className="mt-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="font-medium text-red-900 text-[14px]">
+              {flaggedCount} {flaggedCount === 1 ? 'opinia oflagowana' : 'opinii oflagowanych'} przez moderację AI
+            </h2>
+            <p className="text-[12.5px] text-red-700 mt-0.5">
+              Heurystyki wykryły potencjalne problemy (wulgaryzmy, spam, dane osobowe, off-topic). Sprawdź najpierw te wpisy — są na górze listy.
+            </p>
+          </div>
+        </div>
+      )}
 
       {pending.length === 0 ? (
         <div className="mt-8 bg-white border border-border-soft rounded-2xl p-12 text-center">
@@ -57,7 +78,9 @@ export default async function AdminOpiniePage() {
           {pending.map((r) => (
             <article
               key={r.id}
-              className="bg-white border border-border-soft rounded-2xl p-5 flex flex-col md:flex-row gap-4"
+              className={`bg-white border rounded-2xl p-5 flex flex-col md:flex-row gap-4 ${
+                r.status === 'flagged' ? 'border-red-300 ring-1 ring-red-100' : 'border-border-soft'
+              }`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -85,7 +108,31 @@ export default async function AdminOpiniePage() {
                       zweryfikowany
                     </span>
                   )}
+                  {r.status === 'flagged' && (
+                    <span className="text-[10.5px] px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1">
+                      <ShieldAlert className="w-3 h-3" />
+                      auto-flag · {Math.round((r.moderation?.topScore || 0) * 100)}%
+                    </span>
+                  )}
                 </div>
+
+                {r.status === 'flagged' && r.moderation?.flags && r.moderation.flags.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {r.moderation.flags.map((f, idx) => (
+                      <span
+                        key={idx}
+                        className="text-[10.5px] px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200"
+                        title={
+                          f.matchedTerms && f.matchedTerms.length
+                            ? `Wykryte: ${f.matchedTerms.join(', ')}`
+                            : undefined
+                        }
+                      >
+                        {reasonLabel(f.reason as any)} · {Math.round(f.score * 100)}%
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <h3 className="font-heading text-[16px] text-navy mt-2">{r.title}</h3>
                 <p className="text-[13.5px] text-text-secondary mt-1 whitespace-pre-line line-clamp-4">
                   {r.body}

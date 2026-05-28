@@ -9,6 +9,7 @@ import {
   Settings2,
   HelpCircle,
   UserCog,
+  Code2,
 } from 'lucide-react';
 
 const nav = [
@@ -18,6 +19,7 @@ const nav = [
   { href: '/panel-firmy/kalendarz', label: 'Kalendarz', icon: Calendar },
   { href: '/panel-firmy/faktury', label: 'Faktury', icon: Receipt },
   { href: '/panel-firmy/rankingi', label: 'Rankingi', icon: BarChart3 },
+  { href: '/panel-firmy/widget', label: 'Widget', icon: Code2, badge: 'Premium' },
   { href: '/panel-firmy/profil', label: 'Edycja profilu firmy', icon: UserCog },
 ];
 

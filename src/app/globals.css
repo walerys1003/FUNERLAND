@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-cream text-navy font-body antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  h1, h2, h3, h4, h5 {
+    @apply font-heading text-navy;
+  }
+  ::selection {
+    @apply bg-accent-green/20 text-navy;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-accent-green text-white rounded-btn font-medium text-[15px] transition-all duration-200 hover:bg-accent-green-hover hover:shadow-soft focus:outline-none focus:ring-2 focus:ring-accent-green/40;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-transparent text-navy border border-border-line rounded-btn font-medium text-[15px] transition-all duration-200 hover:bg-white hover:border-navy focus:outline-none focus:ring-2 focus:ring-navy/20;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 text-navy font-medium text-[15px] transition-colors hover:text-accent-green;
+  }
+  .card {
+    @apply bg-white border border-border-soft rounded-card shadow-soft transition-all duration-200;
+  }
+  .card-hover {
+    @apply hover:shadow-card hover:-translate-y-0.5;
+  }
+  .input {
+    @apply w-full h-12 px-4 bg-white border border-border-soft rounded-btn text-navy placeholder:text-text-muted focus:outline-none focus:border-accent-green focus:ring-2 focus:ring-accent-green/15 transition;
+  }
+  .label {
+    @apply block text-[13px] font-medium text-text-secondary mb-1.5;
+  }
+  .container-page {
+    @apply max-w-7xl mx-auto px-5 sm:px-6 lg:px-8;
+  }
+  .section {
+    @apply py-16 md:py-24;
+  }
+  .badge-verified {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 bg-accent-green-light text-accent-green text-[12px] font-medium rounded-md;
+  }
+  .divider-soft {
+    @apply h-px bg-border-soft w-full;
+  }
+}
+
+/* Subtle textured background variant */
+.bg-cream-texture {
+  background-color: #F5F1EA;
+  background-image: radial-gradient(circle at 20% 10%, rgba(46,79,62,0.025), transparent 40%),
+                    radial-gradient(circle at 80% 90%, rgba(15,27,45,0.025), transparent 40%);
+}

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Mail, Phone, MapPin, User as UserIcon, Shield, LogOut } from 'lucide-react';
 import { getServerUser, AUTH_CONFIGURED } from '@/lib/auth/session';
 import AccountActions from './account-actions';
+import TwoFactor from './two-factor';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -112,6 +113,12 @@ export default async function KontoPage() {
             {user.role === 'admin' && <Quick href="/admin" label="Panel admina" />}
             <Quick href="/" label="Strona główna" />
           </div>
+        </section>
+
+        {/* 2FA */}
+        <section className="mt-4 bg-white border border-border-soft rounded-2xl p-6">
+          <h3 className="font-heading text-[16px] text-navy">Bezpieczeństwo</h3>
+          <TwoFactor />
         </section>
 
         {/* RODO */}

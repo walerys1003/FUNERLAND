@@ -5,6 +5,8 @@ import { companies, getCompanyBySlug } from '@/lib/data';
 import { Stars } from '@/components/stars';
 import { VerifiedBadge } from '@/components/verified-badge';
 import { MapPin, Phone, Mail, Clock, ShieldCheck, Check } from 'lucide-react';
+import CompanyGallery from '@/components/marketplace/company-gallery';
+import PaymentSection from '@/components/marketplace/payment-section';
 
 export function generateStaticParams() {
   return companies.map((c) => ({ slug: c.slug }));
@@ -14,6 +16,32 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const company = getCompanyBySlug(slug);
   if (!company) notFound();
+
+  // Build gallery from existing fields + thematic supporting photos.
+  const galleryImages = [
+    { src: company.bannerImage, alt: `${company.name} — widok ogólny` },
+    { src: company.image, alt: `${company.name} — wnętrze` },
+    {
+      src: 'https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?w=1200&q=80&auto=format',
+      alt: 'Sala ceremonii',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=1200&q=80&auto=format',
+      alt: 'Świece i kwiaty',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80&auto=format',
+      alt: 'Kompozycja kwiatowa',
+    },
+    {
+      src: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=1200&q=80&auto=format',
+      alt: 'Krajobraz cmentarza',
+    },
+  ];
+
+  const minPrice = company.services.length
+    ? Math.min(...company.services.map((s) => s.from))
+    : undefined;
 
   return (
     <div>
@@ -50,7 +78,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
             </div>
 
             <div className="mt-7 border-t border-border-soft pt-4 flex flex-wrap gap-6 text-[14px]">
-              {['O firmie', 'Usługi', 'Cennik', 'Opinie', 'Mapa'].map((t, i) => (
+              {['O firmie', 'Galeria', 'Cennik', 'Płatności', 'Opinie'].map((t, i) => (
                 <a
                   key={t}
                   href={`#${t.toLowerCase()}`}
@@ -68,6 +96,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
 
       <div className="container-page py-12 grid lg:grid-cols-[1fr_360px] gap-10">
         <div className="space-y-12">
+          <section id="galeria" aria-labelledby="galeria-heading">
+            <h2 id="galeria-heading" className="font-heading text-h2 mb-5">
+              Galeria
+            </h2>
+            <CompanyGallery images={galleryImages} title={company.name} />
+          </section>
+
           <section id="cennik">
             <h2 className="font-heading text-h2 mb-5">Cennik</h2>
             <div className="grid md:grid-cols-3 gap-4">
@@ -108,6 +143,10 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
               ))}
             </div>
           </section>
+
+          <PaymentSection companyName={company.name} minPrice={minPrice} />
+
+          <PaymentSection companyName={company.name} minPrice={minPrice} />
 
           <section id="opinie">
             <h2 className="font-heading text-h2 mb-5">Opinie zweryfikowane</h2>

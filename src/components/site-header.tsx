@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Logo } from './logo';
-import { Phone, Menu, X } from 'lucide-react';
+import { Phone, Menu, X, User } from 'lucide-react';
 
 const navItems = [
   { href: '/warszawa/zaklady-pogrzebowe', label: 'Znajdź firmę' },
@@ -31,7 +31,15 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="hidden lg:flex items-center gap-3">
-          <Link href="/panel-firmy" className="text-[14px] text-text-secondary hover:text-navy">
+          <Link
+            href="/konto"
+            className="inline-flex items-center gap-1.5 text-[14px] text-text-secondary hover:text-navy"
+            title="Moje konto"
+          >
+            <User className="w-4 h-4" />
+            Moje konto
+          </Link>
+          <Link href="/logowanie" className="text-[14px] text-text-secondary hover:text-navy">
             Logowanie
           </Link>
           <a
@@ -64,7 +72,11 @@ export function SiteHeader() {
               </Link>
             ))}
             <div className="divider-soft my-2" />
-            <Link href="/panel-firmy" className="py-2.5 text-text-secondary">
+            <Link href="/konto" className="py-2.5 text-text-secondary inline-flex items-center gap-2" onClick={() => setOpen(false)}>
+              <User className="w-4 h-4" />
+              Moje konto
+            </Link>
+            <Link href="/logowanie" className="py-2.5 text-text-secondary" onClick={() => setOpen(false)}>
               Logowanie
             </Link>
             <a href="tel:+48800123456" className="py-2.5 flex items-center gap-2 text-navy">

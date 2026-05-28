@@ -92,8 +92,17 @@ const nextConfig = {
         ],
       },
       {
-        // Security headers — apply broadly
-        source: '/(.*)',
+        // Widget embed routes — frame-ancestors otwarte (firmy osadzają u siebie)
+        source: '/widget/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Content-Security-Policy', value: 'frame-ancestors *' },
+        ],
+      },
+      {
+        // Security headers — apply broadly (poza /widget/*)
+        source: '/((?!widget).*)',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -103,6 +112,30 @@ const nextConfig = {
             value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
           },
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            // CSP w trybie Report-Only — bezpieczne wprowadzenie (zero zerwań UI).
+            // Po obserwacji raportów (Sentry / własny endpoint) → przełącz na Content-Security-Policy.
+            key: 'Content-Security-Policy-Report-Only',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://plausible.io https://*.plausible.io https://browser.sentry-cdn.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.supabase.co https://lh3.googleusercontent.com https://res.cloudinary.com https://www.genspark.ai",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://plausible.io https://*.plausible.io https://*.sentry.io https://*.ingest.sentry.io",
+              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+              "media-src 'self' data: blob: https://*.supabase.co",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self' https://checkout.stripe.com",
+              "frame-ancestors 'self'",
+              'upgrade-insecure-requests',
+            ].join('; '),
+          },
         ],
       },
     ];

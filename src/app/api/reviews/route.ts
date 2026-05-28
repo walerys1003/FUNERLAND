@@ -3,6 +3,7 @@ import { reviewRepo, bookingRepo, moderationRepo } from '@/lib/marketplace/repo'
 import { reviewStore } from '@/lib/marketplace/store';
 import { requireRole } from '@/lib/auth/session';
 import { moderateText, reasonLabel } from '@/lib/moderation/heuristics';
+import { rateLimit, RL_PRESETS } from '@/lib/security/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,8 @@ export async function GET(req: Request) {
 
 // POST /api/reviews — submit a review
 export async function POST(req: Request) {
+  const rl = await rateLimit(req, RL_PRESETS.review);
+  if (!rl.ok) return rl.response;
   try {
     const data = await req.json();
     if (!data.companySlug) {

@@ -7,6 +7,8 @@ import ChatWidget from '@/components/ai/chat-widget';
 import { ToastProvider } from '@/components/ui/toast';
 import WebVitals from '@/components/perf/web-vitals';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/seo/json-ld';
+import { CookieConsent } from '@/components/legal/CookieConsent';
+import { PlausibleScript } from '@/components/analytics/plausible';
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'], variable: '--font-inter', display: 'swap' });
 const lora = Lora({ subsets: ['latin', 'latin-ext'], variable: '--font-lora', display: 'swap' });
@@ -81,6 +83,7 @@ export const metadata: Metadata = {
     icon: '/icon.svg',
     apple: '/icon.svg',
   },
+  manifest: '/manifest.json',
   category: 'lifestyle',
 };
 
@@ -117,6 +120,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </main>
           <SiteFooter />
           <ChatWidget />
+          <CookieConsent />
+          <PlausibleScript />
         </ToastProvider>
       </body>
     </html>

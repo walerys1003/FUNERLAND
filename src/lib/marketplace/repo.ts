@@ -1156,6 +1156,56 @@ export const subscriptionRepo = {
     };
   },
 
+  /**
+   * Log a billing event (Stripe webhook). Best-effort, non-throwing.
+   * Writes to `billing_events` table when Supabase is wired; otherwise stays in-memory.
+   */
+  async logEvent(evt: {
+    type: string;
+    companySlug?: string;
+    plan?: PlanId | string;
+    stripeSubscriptionId?: string;
+    stripeInvoiceId?: string;
+    amount?: number;
+    currency?: string;
+    status?: string;
+    meta?: Record<string, any>;
+  }): Promise<void> {
+    if (!USE_SUPABASE) {
+      // in-memory ring buffer for debug
+      (globalThis as any).__billingEvents = (globalThis as any).__billingEvents || [];
+      (globalThis as any).__billingEvents.push({ ...evt, at: new Date().toISOString() });
+      if ((globalThis as any).__billingEvents.length > 500) {
+        (globalThis as any).__billingEvents.shift();
+      }
+      return;
+    }
+    try {
+      let companyId: string | null = null;
+      if (evt.companySlug) {
+        const { data: c } = await admin()
+          .from('companies')
+          .select('id')
+          .eq('slug', evt.companySlug)
+          .maybeSingle();
+        companyId = (c?.id as any) ?? null;
+      }
+      await admin().from('billing_events').insert({
+        type: evt.type,
+        company_id: companyId,
+        plan: evt.plan ?? null,
+        stripe_subscription_id: evt.stripeSubscriptionId ?? null,
+        stripe_invoice_id: evt.stripeInvoiceId ?? null,
+        amount_cents: typeof evt.amount === 'number' ? evt.amount : null,
+        currency: evt.currency ?? 'PLN',
+        status: evt.status ?? null,
+        meta: evt.meta ?? {},
+      });
+    } catch (e) {
+      console.warn('[subscriptionRepo.logEvent] failed:', e);
+    }
+  },
+
   /** Check if a company has at least a given plan (uses DB function when available). */
   async companyHasPlan(companySlug: string, minPlan: PlanId): Promise<boolean> {
     if (!USE_SUPABASE) {

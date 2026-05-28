@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { findMatchesV2, recommendedSort } from '@/lib/ai/matcher';
 import { aiMatchRepo } from '@/lib/marketplace/repo';
 import type { FilterState } from '@/lib/marketplace/filters';
+import { rateLimit, RL_PRESETS } from '@/lib/security/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,8 @@ export const dynamic = 'force-dynamic';
  *   }
  */
 export async function POST(req: Request) {
+  const rl = await rateLimit(req, RL_PRESETS.aiMatch);
+  if (!rl.ok) return rl.response;
   try {
     const body = (await req.json()) as Partial<FilterState> & {
       needs?: string[];

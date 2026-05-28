@@ -375,3 +375,46 @@ export function combineJsonLd(...items: any[]) {
   if (items.length === 1) return items[0];
   return items.filter(Boolean);
 }
+
+// ===================== Obituary (Article schema for nekrologi) =====================
+export type ObituaryLDInput = {
+  slug: string;
+  name: string;
+  birthDate?: string;
+  deathDate?: string;
+  city?: string;
+  description?: string;
+  imageUrl?: string;
+  publishedAt?: string;
+};
+
+export function obituaryJsonLd(o: ObituaryLDInput) {
+  const url = `${BASE_URL}/nekrolog/${o.slug}`;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    '@id': `${url}#article`,
+    headline: `Nekrolog: ${o.name}`,
+    description: o.description || `Nekrolog ${o.name}${o.city ? ` z ${o.city}` : ''}`,
+    image: o.imageUrl,
+    datePublished: o.publishedAt,
+    inLanguage: 'pl-PL',
+    publisher: { '@type': 'Organization', name: BRAND_NAME, url: BASE_URL },
+    mainEntityOfPage: url,
+    about: {
+      '@type': 'Person',
+      name: o.name,
+      birthDate: o.birthDate,
+      deathDate: o.deathDate,
+      ...(o.city ? { homeLocation: { '@type': 'Place', name: o.city } } : {}),
+    },
+  };
+}
+
+/** Convenience: spread directly into a <script> JSX */
+export function jsonLdScriptProps(data: any) {
+  return {
+    type: 'application/ld+json',
+    dangerouslySetInnerHTML: { __html: JSON.stringify(data) },
+  };
+}

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { moderateText } from '@/lib/moderation/heuristics';
+import { rateLimit, RL_PRESETS } from '@/lib/security/rate-limit';
+import { ModerateSchema, validationError } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,20 +17,20 @@ export const dynamic = 'force-dynamic';
  * No auth required — this is a lightweight read-only utility endpoint.
  */
 export async function POST(req: Request) {
+  const rl = await rateLimit(req, RL_PRESETS.moderate);
+  if (!rl.ok) return rl.response;
+
   let body: any;
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
-  const text = String(body?.text || '');
-  if (!text || text.length > 10_000) {
-    return NextResponse.json(
-      { error: text.length > 10_000 ? 'Tekst zbyt długi (max 10000 znaków).' : 'Brak tekstu.' },
-      { status: 400 },
-    );
+  const parsed = ModerateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed as any), { status: 400 });
   }
-  const result = moderateText(text);
+  const result = moderateText((parsed.data as any).text);
   return NextResponse.json({
     ok: true,
     ...result,

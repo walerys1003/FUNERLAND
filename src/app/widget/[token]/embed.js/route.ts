@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyWidgetToken, isOriginAllowed } from '@/lib/widget/token';
+import { widgetRepo } from '@/lib/marketplace/repo';
 import { companies as ALL } from '@/lib/data';
 
 export const runtime = 'nodejs';
@@ -33,14 +34,28 @@ export async function GET(
   }
 
   const origin = req.headers.get('origin');
-  // In demo mode (no DB), all origins allowed. Production: load allowed_origins
-  // from company_widgets table by token and pass to isOriginAllowed().
-  const allowedOrigins: string[] | null = null;
+  // Look up persisted widget config to enforce allowed_origins (Premium feature).
+  // When no DB row exists yet (demo mode or token issued before persistence) → allow all.
+  const widgetCfg = await widgetRepo.byToken(token).catch(() => null);
+  const allowedOrigins: string[] | null = widgetCfg?.allowedOrigins?.length
+    ? widgetCfg.allowedOrigins
+    : null;
+  if (widgetCfg && widgetCfg.active === false) {
+    return new NextResponse('console.warn("[PP widget] widget revoked by owner");', {
+      status: 200,
+      headers: { 'content-type': 'application/javascript; charset=utf-8' },
+    });
+  }
   if (!isOriginAllowed(origin, allowedOrigins)) {
     return new NextResponse('console.warn("[PP widget] origin not allowed");', {
       status: 200,
       headers: { 'content-type': 'application/javascript; charset=utf-8' },
     });
+  }
+
+  // Fire-and-forget view tracking
+  if (widgetCfg) {
+    widgetRepo.trackView(token).catch(() => undefined);
   }
 
   const { c: slug, v: variant } = verified.payload;

@@ -623,4 +623,555 @@ function mapMessageRow(row: any): Message {
   } as Message;
 }
 
+/* -------------------------- Company widgets (Phase 3 Agent 8 follow-up) -------------------------- */
+
+import type { WidgetVariant } from '@/lib/widget/token';
+
+export type CompanyWidget = {
+  id: string;
+  companySlug: string;
+  token: string;
+  variant: WidgetVariant;
+  theme: 'light' | 'dark' | 'auto';
+  primaryColor: string;
+  allowedOrigins: string[];
+  views: number;
+  clicks: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// In-memory store for demo mode (no Supabase). Keyed by token for fast lookup.
+const widgetMem = new Map<string, CompanyWidget>();
+
+function mapWidgetRow(row: any, companySlug?: string): CompanyWidget {
+  return {
+    id: row.id,
+    companySlug: companySlug || row.company_slug || '',
+    token: row.token,
+    variant: (row.variant || 'card') as WidgetVariant,
+    theme: (row.theme || 'light') as 'light' | 'dark' | 'auto',
+    primaryColor: row.primary_color || '#2E4F3E',
+    allowedOrigins: row.allowed_origins || [],
+    views: row.views || 0,
+    clicks: row.clicks || 0,
+    active: row.active !== false,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export const widgetRepo = {
+  /** Upsert a widget config (by company_id + variant unique constraint). */
+  async upsert(input: {
+    companySlug: string;
+    token: string;
+    variant: WidgetVariant;
+    theme?: 'light' | 'dark' | 'auto';
+    primaryColor?: string;
+    allowedOrigins?: string[];
+  }): Promise<CompanyWidget | null> {
+    if (!USE_SUPABASE) {
+      const now = new Date().toISOString();
+      const w: CompanyWidget = {
+        id: `wid_${Buffer.from(input.token).toString('base64').slice(0, 12)}`,
+        companySlug: input.companySlug,
+        token: input.token,
+        variant: input.variant,
+        theme: input.theme || 'light',
+        primaryColor: input.primaryColor || '#2E4F3E',
+        allowedOrigins: input.allowedOrigins || [],
+        views: 0,
+        clicks: 0,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      widgetMem.set(input.token, w);
+      return w;
+    }
+    const { data: c } = await admin()
+      .from('companies')
+      .select('id')
+      .eq('slug', input.companySlug)
+      .maybeSingle();
+    if (!c) return null;
+
+    // Try update existing (company_id + variant) — unique index
+    const { data: existing } = await admin()
+      .from('company_widgets')
+      .select('id')
+      .eq('company_id', c.id)
+      .eq('variant', input.variant)
+      .maybeSingle();
+
+    const payload = {
+      company_id: c.id,
+      token: input.token,
+      variant: input.variant,
+      theme: input.theme || 'light',
+      primary_color: input.primaryColor || '#2E4F3E',
+      allowed_origins: input.allowedOrigins || [],
+      active: true,
+    };
+
+    if (existing) {
+      const { data, error } = await admin()
+        .from('company_widgets')
+        .update(payload)
+        .eq('id', existing.id)
+        .select('*')
+        .single();
+      if (error || !data) return null;
+      return mapWidgetRow(data, input.companySlug);
+    }
+    const { data, error } = await admin()
+      .from('company_widgets')
+      .insert(payload)
+      .select('*')
+      .single();
+    if (error || !data) return null;
+    return mapWidgetRow(data, input.companySlug);
+  },
+
+  /** Look up widget by its public token (used by /widget/[token]/embed for origin check). */
+  async byToken(token: string): Promise<CompanyWidget | null> {
+    if (!USE_SUPABASE) return widgetMem.get(token) || null;
+    const { data } = await admin()
+      .from('company_widgets')
+      .select('*, companies!inner(slug)')
+      .eq('token', token)
+      .maybeSingle();
+    if (!data) return null;
+    return mapWidgetRow(data, (data as any).companies?.slug);
+  },
+
+  /** List all widgets for a company (used in /panel-firmy/widget management). */
+  async forCompany(companySlug: string): Promise<CompanyWidget[]> {
+    if (!USE_SUPABASE) {
+      return Array.from(widgetMem.values()).filter((w) => w.companySlug === companySlug);
+    }
+    const { data: c } = await admin()
+      .from('companies')
+      .select('id')
+      .eq('slug', companySlug)
+      .maybeSingle();
+    if (!c) return [];
+    const { data } = await admin()
+      .from('company_widgets')
+      .select('*')
+      .eq('company_id', c.id)
+      .order('created_at', { ascending: false });
+    return (data || []).map((row: any) => mapWidgetRow(row, companySlug));
+  },
+
+  /** Revoke (deactivate) a widget — token will stop serving content. */
+  async revoke(token: string): Promise<boolean> {
+    if (!USE_SUPABASE) {
+      const w = widgetMem.get(token);
+      if (!w) return false;
+      w.active = false;
+      widgetMem.set(token, w);
+      return true;
+    }
+    const { error } = await admin()
+      .from('company_widgets')
+      .update({ active: false })
+      .eq('token', token);
+    return !error;
+  },
+
+  /** Increment view counter (fire-and-forget from /widget/[token]/embed). */
+  async trackView(token: string): Promise<void> {
+    if (!USE_SUPABASE) {
+      const w = widgetMem.get(token);
+      if (w) {
+        w.views++;
+        widgetMem.set(token, w);
+      }
+      return;
+    }
+    // Postgres atomic increment via RPC fallback — use update + select pattern
+    try {
+      await admin().rpc('increment_widget_views', { p_token: token });
+    } catch {
+      // Soft-fall to read-modify-write
+      const { data } = await admin()
+        .from('company_widgets')
+        .select('id, views')
+        .eq('token', token)
+        .maybeSingle();
+      if (data) {
+        await admin()
+          .from('company_widgets')
+          .update({ views: (data.views || 0) + 1 })
+          .eq('id', data.id);
+      }
+    }
+  },
+};
+
+/* -------------------------- AI Match queries logging (Phase 3 Agent 9 follow-up) -------------------------- */
+
+export const aiMatchRepo = {
+  /**
+   * Log an AI match query for analytics + future ML training.
+   * Fire-and-forget — never throws.
+   */
+  async log(input: {
+    query?: string;
+    filterState?: any;
+    resultsCount: number;
+    sessionId?: string;
+    userId?: string;
+    ip?: string;
+  }): Promise<string | null> {
+    if (!USE_SUPABASE) return null;
+    try {
+      const { data, error } = await admin()
+        .from('ai_match_queries')
+        .insert({
+          query: input.query || null,
+          filter_state: input.filterState || {},
+          results_count: input.resultsCount,
+          session_id: input.sessionId || null,
+          user_id: input.userId || null,
+          ip: input.ip || null,
+        })
+        .select('id')
+        .single();
+      if (error || !data) return null;
+      return data.id as string;
+    } catch (e) {
+      console.warn('aiMatchRepo.log failed:', e);
+      return null;
+    }
+  },
+
+  /** Mark a click on a result (used to compute CTR per position). */
+  async markClick(queryId: string, companySlug: string, position: number): Promise<boolean> {
+    if (!USE_SUPABASE || !queryId) return false;
+    try {
+      const { data: c } = await admin()
+        .from('companies')
+        .select('id')
+        .eq('slug', companySlug)
+        .maybeSingle();
+      if (!c) return false;
+      const { error } = await admin()
+        .from('ai_match_queries')
+        .update({ clicked_company_id: c.id, clicked_position: position })
+        .eq('id', queryId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+};
+
+/* -------------------------- Moderation flags (Phase 3 Agent 6 follow-up) -------------------------- */
+
+export type ReviewFlagRecord = {
+  id: string;
+  reviewId: string;
+  source: 'auto' | 'user' | 'admin';
+  reason: string;
+  score?: number;
+  details?: any;
+  resolved: boolean;
+  resolvedAt?: string;
+  createdAt: string;
+};
+
+export const moderationRepo = {
+  /**
+   * Save moderation flags for a review (called from /api/reviews after moderateText).
+   * In demo mode (no Supabase), stores nothing — the moderation result is already
+   * attached to the Review row in reviewStore.
+   */
+  async saveAutoFlags(
+    reviewId: string,
+    flags: { reason: string; score: number; matchedTerms?: string[]; excerpt?: string }[],
+  ): Promise<number> {
+    if (!USE_SUPABASE || flags.length === 0) return 0;
+    const rows = flags.map((f) => ({
+      review_id: reviewId,
+      source: 'auto' as const,
+      reason: f.reason,
+      score: Math.max(0, Math.min(1, f.score)),
+      details: {
+        matched_terms: f.matchedTerms || [],
+        excerpt: f.excerpt,
+        heuristic: 'src/lib/moderation/heuristics.ts',
+      },
+    }));
+    const { error, count } = await admin().from('review_flags').insert(rows, { count: 'exact' });
+    if (error) {
+      console.error('moderationRepo.saveAutoFlags error:', error);
+      return 0;
+    }
+    return count || rows.length;
+  },
+
+  /** Record a user-reported flag (from "Zgłoś" button on review). */
+  async reportByUser(
+    reviewId: string,
+    reason: string,
+    details?: any,
+    reporterId?: string,
+  ): Promise<ReviewFlagRecord | null> {
+    if (!USE_SUPABASE) return null;
+    const { data, error } = await admin()
+      .from('review_flags')
+      .insert({
+        review_id: reviewId,
+        source: 'user',
+        reason,
+        details: details || {},
+        reporter_id: reporterId || null,
+      })
+      .select('*')
+      .single();
+    if (error || !data) return null;
+    return mapFlagRow(data);
+  },
+
+  /** List unresolved flags for admin queue. */
+  async unresolved(limit = 50): Promise<ReviewFlagRecord[]> {
+    if (!USE_SUPABASE) return [];
+    const { data } = await admin()
+      .from('review_flags')
+      .select('*')
+      .eq('resolved', false)
+      .order('score', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return (data || []).map(mapFlagRow);
+  },
+
+  /** Mark a flag as resolved (admin action). */
+  async resolve(flagId: string, adminUserId?: string): Promise<boolean> {
+    if (!USE_SUPABASE) return false;
+    const { error } = await admin()
+      .from('review_flags')
+      .update({
+        resolved: true,
+        resolved_at: new Date().toISOString(),
+        resolved_by: adminUserId || null,
+      })
+      .eq('id', flagId);
+    return !error;
+  },
+
+  /** Get flags for a single review. */
+  async forReview(reviewId: string): Promise<ReviewFlagRecord[]> {
+    if (!USE_SUPABASE) return [];
+    const { data } = await admin()
+      .from('review_flags')
+      .select('*')
+      .eq('review_id', reviewId)
+      .order('created_at', { ascending: false });
+    return (data || []).map(mapFlagRow);
+  },
+};
+
+function mapFlagRow(row: any): ReviewFlagRecord {
+  return {
+    id: row.id,
+    reviewId: row.review_id,
+    source: row.source,
+    reason: row.reason,
+    score: row.score != null ? Number(row.score) : undefined,
+    details: row.details,
+    resolved: !!row.resolved,
+    resolvedAt: row.resolved_at || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+/* -------------------------- Subscriptions (Phase 3 Agent 4 follow-up) -------------------------- */
+
+import type { Subscription } from '@/lib/billing/subscriptions-store';
+import { subscriptionStore } from '@/lib/billing/subscriptions-store';
+import { fromDbPlan, toDbPlan } from '@/lib/billing/plan-mapping';
+import type { PlanId } from '@/lib/billing/plans';
+
+function mapSubscriptionRow(row: any, companySlug?: string, companyName?: string): Subscription {
+  return {
+    id: row.id,
+    companySlug: companySlug || row.company_slug || '',
+    companyName,
+    plan: fromDbPlan(row.plan),
+    status:
+      row.status === 'past_due'
+        ? 'past_due'
+        : row.status === 'trialing'
+          ? 'trialing'
+          : row.status === 'canceled'
+            ? 'canceled'
+            : 'active',
+    amount: row.amount_cents != null ? Math.round((row.amount_cents as number) / 100) : 0,
+    period: row.period === 'year' ? 'yearly' : 'monthly',
+    currentPeriodEnd: row.current_period_end || row.trial_end || new Date().toISOString(),
+    createdAt: row.created_at || new Date().toISOString(),
+    stripeSubscriptionId: row.stripe_subscription_id || undefined,
+  };
+}
+
+export const subscriptionRepo = {
+  /** List all subscriptions (admin view). */
+  async list(): Promise<Subscription[]> {
+    if (!USE_SUPABASE) return subscriptionStore.list();
+    const { data, error } = await admin()
+      .from('company_subscriptions')
+      .select('*, companies!inner(slug, name)')
+      .order('created_at', { ascending: false });
+    if (error || !data) return subscriptionStore.list();
+    return data.map((row: any) =>
+      mapSubscriptionRow(row, row.companies?.slug, row.companies?.name),
+    );
+  },
+
+  /** Get a single subscription by id. */
+  async get(id: string): Promise<Subscription | null> {
+    if (!USE_SUPABASE) return subscriptionStore.get(id) || null;
+    const { data } = await admin()
+      .from('company_subscriptions')
+      .select('*, companies(slug, name)')
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    return mapSubscriptionRow(data, (data as any).companies?.slug, (data as any).companies?.name);
+  },
+
+  /** Find subscription by company slug (latest non-canceled). */
+  async forCompany(companySlug: string): Promise<Subscription | null> {
+    if (!USE_SUPABASE) {
+      return subscriptionStore.list().find((s) => s.companySlug === companySlug) || null;
+    }
+    const { data: c } = await admin()
+      .from('companies')
+      .select('id, name')
+      .eq('slug', companySlug)
+      .maybeSingle();
+    if (!c) return null;
+    const { data } = await admin()
+      .from('company_subscriptions')
+      .select('*')
+      .eq('company_id', c.id)
+      .neq('status', 'canceled')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return mapSubscriptionRow(data, companySlug, (c as any).name);
+  },
+
+  /**
+   * Upsert subscription — used by Stripe webhook handler.
+   * Matches on stripe_subscription_id when provided, otherwise on (company_id, plan).
+   */
+  async upsert(sub: Subscription): Promise<Subscription> {
+    if (!USE_SUPABASE) return subscriptionStore.upsert(sub);
+    const { data: c } = await admin()
+      .from('companies')
+      .select('id')
+      .eq('slug', sub.companySlug)
+      .maybeSingle();
+    if (!c) return subscriptionStore.upsert(sub);
+
+    const row = {
+      company_id: c.id,
+      plan: toDbPlan(sub.plan),
+      status: sub.status,
+      stripe_subscription_id: sub.stripeSubscriptionId || null,
+      amount_cents: Math.round((sub.amount || 0) * 100),
+      currency: 'PLN',
+      period: sub.period === 'yearly' ? 'year' : 'month',
+      current_period_end: sub.currentPeriodEnd,
+    };
+
+    // Prefer match on stripe_subscription_id when present (idempotent webhook)
+    if (sub.stripeSubscriptionId) {
+      const { data: existing } = await admin()
+        .from('company_subscriptions')
+        .select('id')
+        .eq('stripe_subscription_id', sub.stripeSubscriptionId)
+        .maybeSingle();
+      if (existing) {
+        const { data, error } = await admin()
+          .from('company_subscriptions')
+          .update(row)
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+        if (error || !data) return subscriptionStore.upsert(sub);
+        return mapSubscriptionRow(data, sub.companySlug, sub.companyName);
+      }
+    }
+
+    const { data, error } = await admin()
+      .from('company_subscriptions')
+      .insert(row)
+      .select('*')
+      .single();
+    if (error || !data) return subscriptionStore.upsert(sub);
+    return mapSubscriptionRow(data, sub.companySlug, sub.companyName);
+  },
+
+  /** Cancel a subscription by id. */
+  async cancel(id: string): Promise<Subscription | null> {
+    if (!USE_SUPABASE) return subscriptionStore.cancel(id);
+    const { data, error } = await admin()
+      .from('company_subscriptions')
+      .update({ status: 'canceled', canceled_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error || !data) return null;
+    return mapSubscriptionRow(data);
+  },
+
+  /** Aggregated metrics for /admin/finanse. */
+  async stats() {
+    if (!USE_SUPABASE) return subscriptionStore.stats();
+    const all = await this.list();
+    const active = all.filter((s) => s.status === 'active');
+    const mrr = active.reduce(
+      (a, s) => a + (s.period === 'monthly' ? s.amount : s.amount / 12),
+      0,
+    );
+    return {
+      total: all.length,
+      active: active.length,
+      pastDue: all.filter((s) => s.status === 'past_due').length,
+      canceled: all.filter((s) => s.status === 'canceled').length,
+      mrr: Math.round(mrr),
+      byPlan: {
+        premium: active.filter((s) => s.plan === 'premium').length,
+        pro: active.filter((s) => s.plan === 'pro').length,
+        standard: active.filter((s) => s.plan === 'standard').length,
+      },
+    };
+  },
+
+  /** Check if a company has at least a given plan (uses DB function when available). */
+  async companyHasPlan(companySlug: string, minPlan: PlanId): Promise<boolean> {
+    if (!USE_SUPABASE) {
+      const sub = subscriptionStore.list().find((s) => s.companySlug === companySlug && s.status === 'active');
+      const RANK: Record<PlanId, number> = { free: 0, standard: 1, pro: 2, premium: 3 };
+      return sub ? RANK[sub.plan] >= RANK[minPlan] : minPlan === 'free';
+    }
+    const { data: c } = await admin().from('companies').select('id').eq('slug', companySlug).maybeSingle();
+    if (!c) return false;
+    const { data, error } = await admin().rpc('company_has_plan', {
+      p_company_id: c.id,
+      p_min_plan: toDbPlan(minPlan),
+    });
+    if (error) return false;
+    return Boolean(data);
+  },
+};
+
 export const REPO_BACKEND = USE_SUPABASE ? 'supabase' : 'memory';

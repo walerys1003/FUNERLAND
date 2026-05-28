@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { findMatchesV2, recommendedSort } from '@/lib/ai/matcher';
+import { aiMatchRepo } from '@/lib/marketplace/repo';
 import type { FilterState } from '@/lib/marketplace/filters';
 
 export const runtime = 'nodejs';
@@ -66,9 +67,21 @@ export async function POST(req: Request) {
       limit: body.limit ?? 5,
     });
 
+    // Fire-and-forget log (returns null in demo mode)
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || undefined;
+    const sessionId = req.headers.get('x-pp-session') || undefined;
+    const queryId = await aiMatchRepo.log({
+      query: body.query,
+      filterState: result.query,
+      resultsCount: result.matches.length,
+      sessionId,
+      ip,
+    });
+
     return NextResponse.json({
       ...result,
       suggestedSort: recommendedSort(result.query),
+      queryId, // null when Supabase not configured
       version: 'v2',
     });
   } catch (e: any) {

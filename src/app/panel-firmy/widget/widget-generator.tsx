@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Copy, Check, Code2, Globe } from 'lucide-react';
+import { Copy, Check, Code2, Globe, Save, Loader2 } from 'lucide-react';
 import type { WidgetVariant } from '@/lib/widget/token';
 
 type VariantMeta = { key: WidgetVariant; label: string; description: string };
@@ -29,8 +29,14 @@ export default function WidgetGenerator({
   const [snippetType, setSnippetType] = useState<SnippetType>('script');
   const [allowedOrigins, setAllowedOrigins] = useState('');
   const [copied, setCopied] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [issuedToken, setIssuedToken] = useState<Record<string, string>>({});
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const [issueOk, setIssueOk] = useState(false);
 
-  const token = tokensByVariant[variant];
+  // Active token: either freshly issued via API (persists allowed_origins) or the
+  // pre-generated stateless token from server component.
+  const token = issuedToken[variant] || tokensByVariant[variant];
   const previewUrl = `${baseUrl}/widget/${token}/embed?variant=${variant}`;
 
   const heightMap: Record<WidgetVariant, number> = {
@@ -62,6 +68,33 @@ export default function WidgetGenerator({
       setTimeout(() => setCopied(false), 1800);
     } catch {
       // ignore
+    }
+  };
+
+  const issueAndSave = async () => {
+    if (!isPremium) return;
+    setIssuing(true);
+    setIssueError(null);
+    setIssueOk(false);
+    try {
+      const origins = allowedOrigins
+        .split(/[,\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await fetch('/api/widget/issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variant, allowedOrigins: origins }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Błąd wystawiania widgetu');
+      setIssuedToken((prev) => ({ ...prev, [variant]: data.token }));
+      setIssueOk(true);
+      setTimeout(() => setIssueOk(false), 2500);
+    } catch (e: any) {
+      setIssueError(e.message || 'Wystąpił błąd');
+    } finally {
+      setIssuing(false);
     }
   };
 
@@ -178,9 +211,36 @@ export default function WidgetGenerator({
                 }`}
               />
               <p className="text-[10.5px] text-text-muted mt-1">
-                Zostaw puste, by widget działał wszędzie. Po zapisie ograniczenia działają na
-                poziomie iframe + JS bootstrap (CORS).
+                Oddzielaj przecinkami. Wzorzec <code className="font-mono">*.twoja-strona.pl</code> dopasuje wszystkie subdomeny. Pusta lista = brak ograniczeń.
               </p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={issueAndSave}
+                  disabled={!isPremium || issuing}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium ${
+                    isPremium
+                      ? 'bg-navy text-white hover:bg-navy-deep disabled:opacity-60'
+                      : 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                  }`}
+                >
+                  {issuing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Wystawiam...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" /> Wystaw i zapisz token
+                    </>
+                  )}
+                </button>
+                {issueOk && (
+                  <span className="text-[11px] text-emerald-700 inline-flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Token zapisany
+                  </span>
+                )}
+                {issueError && <span className="text-[11px] text-red-600">{issueError}</span>}
+              </div>
             </div>
 
             <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 text-[11.5px] text-text-secondary">

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { reviewRepo, bookingRepo } from '@/lib/marketplace/repo';
+import { reviewRepo, bookingRepo, moderationRepo } from '@/lib/marketplace/repo';
 import { reviewStore } from '@/lib/marketplace/store';
 import { requireRole } from '@/lib/auth/session';
 import { moderateText, reasonLabel } from '@/lib/moderation/heuristics';
@@ -74,6 +74,16 @@ export async function POST(req: Request) {
     });
 
     if (!review) return NextResponse.json({ error: 'Firma nie istnieje' }, { status: 404 });
+
+    // Persist auto-flags to review_flags table (no-op when Supabase not configured).
+    // Failure here is non-fatal — the moderation result is also attached inline to the review row.
+    if (moderation.flags.length > 0) {
+      try {
+        await moderationRepo.saveAutoFlags(review.id, moderation.flags);
+      } catch (e) {
+        console.warn('moderationRepo.saveAutoFlags failed:', e);
+      }
+    }
 
     // If moderation flagged for review, ensure status reflects that:
     //   - was 'published' → demote to 'flagged' (auto-flagged, needs admin look)

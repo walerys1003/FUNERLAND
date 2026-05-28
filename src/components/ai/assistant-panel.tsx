@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Loader2, Star, ShieldCheck, ArrowRight, Send } from 'lucide-react';
+import { Sparkles, Loader2, Star, ShieldCheck, ArrowRight, Send, Filter } from 'lucide-react';
 
 const CITIES = ['Warszawa', 'Kraków', 'Wrocław', 'Łódź', 'Lublin', 'Poznań', 'Gdańsk'];
 const BUDGETS = [
@@ -18,6 +18,15 @@ const URGENCIES = [
   { id: 'powyzej-tygodnia', label: 'powyżej tygodnia' },
 ];
 const NEEDS = ['transmisja online', 'kwiaty', 'transport', 'kremacja', 'sala', 'nekrolog', 'ceremoniarz'];
+// Agent 9 v2: structured feature tags matching company.features in seed data
+const FEATURES = [
+  { id: 'chłodnia', label: 'Chłodnia' },
+  { id: 'kaplica', label: 'Kaplica' },
+  { id: '24/7', label: 'Czynne 24/7' },
+  { id: 'transmisja', label: 'Transmisja online' },
+  { id: 'transport-miedzynarodowy', label: 'Transport międzynarodowy' },
+  { id: 'parking', label: 'Parking' },
+];
 
 type Match = {
   slug: string;
@@ -37,13 +46,23 @@ export default function AssistantPanel() {
   const [budget, setBudget] = useState('3000-5000');
   const [urgency, setUrgency] = useState('do-3-dni');
   const [needs, setNeeds] = useState<string[]>([]);
+  const [features, setFeatures] = useState<string[]>([]);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [extra, setExtra] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ matches: Match[]; summary: string } | null>(null);
+  const [result, setResult] = useState<{
+    matches: Match[];
+    summary: string;
+    appliedFilters?: string[];
+    queryId?: string | null;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function toggleNeed(n: string) {
     setNeeds((arr) => (arr.includes(n) ? arr.filter((x) => x !== n) : [...arr, n]));
+  }
+  function toggleFeature(f: string) {
+    setFeatures((arr) => (arr.includes(f) ? arr.filter((x) => x !== f) : [...arr, f]));
   }
 
   async function run() {
@@ -52,10 +71,19 @@ export default function AssistantPanel() {
     try {
       const finalNeeds = [...needs];
       if (extra.trim()) finalNeeds.push(extra.trim());
-      const res = await fetch('/api/ai/match', {
+      // Agent 9 v2: use the v2 endpoint that accepts features[] + verifiedOnly + logs query
+      const res = await fetch('/api/ai/match/v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ city, budget, urgency, needs: finalNeeds, limit: 3 }),
+        body: JSON.stringify({
+          city,
+          budget,
+          urgency,
+          needs: finalNeeds,
+          features: features.length ? features : undefined,
+          verifiedOnly: verifiedOnly || undefined,
+          limit: 3,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Błąd matchera');
@@ -68,6 +96,21 @@ export default function AssistantPanel() {
     }
   }
 
+  /** Fire-and-forget click tracking for CTR analytics. */
+  function trackClick(slug: string, position: number) {
+    if (!result?.queryId) return;
+    try {
+      fetch('/api/ai/match/click', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({ queryId: result.queryId, companySlug: slug, position }),
+      });
+    } catch {
+      // ignore
+    }
+  }
+
   if (step === 2 && result) {
     return (
       <div className="space-y-4">
@@ -77,6 +120,18 @@ export default function AssistantPanel() {
             <span className="text-xs font-medium uppercase tracking-wide">Wyniki dopasowania</span>
           </div>
           <p className="text-sm text-stone-700 mt-2">{result.summary}</p>
+          {result.appliedFilters && result.appliedFilters.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {result.appliedFilters.map((f, idx) => (
+                <span
+                  key={idx}
+                  className="text-[10.5px] px-2 py-0.5 rounded-full bg-[#2E4F3E]/10 text-[#2E4F3E] border border-[#2E4F3E]/20"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {result.matches.map((m, i) => (
@@ -124,12 +179,14 @@ export default function AssistantPanel() {
             <div className="flex gap-2 mt-4">
               <Link
                 href={`/firma/${m.slug}`}
+                onClick={() => trackClick(m.slug, i + 1)}
                 className="flex-1 text-center px-3 py-2 rounded-lg border border-stone-300 text-stone-700 hover:bg-stone-50 text-sm"
               >
                 Zobacz wizytówkę
               </Link>
               <Link
                 href={`/rezerwacja/zaklady-pogrzebowe?company=${m.slug}`}
+                onClick={() => trackClick(m.slug, i + 1)}
                 className="flex-1 text-center px-3 py-2 rounded-lg bg-[#2E4F3E] text-white text-sm hover:bg-[#26412F] inline-flex items-center justify-center gap-1"
               >
                 Zarezerwuj <ArrowRight className="h-3.5 w-3.5" />
@@ -237,6 +294,38 @@ export default function AssistantPanel() {
           placeholder="Inne potrzeby (np. obsługa międzynarodowa)"
           className="w-full mt-3 px-3 py-2.5 rounded-lg border border-stone-300 focus:border-[#2E4F3E] focus:outline-none text-sm"
         />
+      </section>
+
+      <section>
+        <label className="text-sm font-medium text-stone-700 mb-2 flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5" /> Wymagane udogodnienia <span className="text-xs text-stone-400 font-normal">(opcjonalne, twarde filtry)</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {FEATURES.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => toggleFeature(f.id)}
+              className={`px-3 py-1.5 rounded-full text-xs border transition ${
+                features.includes(f.id)
+                  ? 'border-[#2E4F3E] bg-[#2E4F3E] text-white'
+                  : 'border-stone-300 text-stone-700 hover:border-[#2E4F3E]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-stone-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={verifiedOnly}
+            onChange={(e) => setVerifiedOnly(e.target.checked)}
+            className="rounded border-stone-400 text-[#2E4F3E] focus:ring-[#2E4F3E]"
+          />
+          <span>Pokaż tylko zweryfikowane firmy</span>
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+        </label>
       </section>
 
       {error && (

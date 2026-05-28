@@ -25,6 +25,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/zapytanie`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
     { url: `${BASE_URL}/szukaj`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${BASE_URL}/asystent`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE_URL}/firmy`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${BASE_URL}/porownaj`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE_URL}/marketplace`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
   ];
 
   // ---- Tools (high SEO ROI — kalkulatory, generatory) ----

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import GoogleButton from './google-button';
 
 type Role = 'family' | 'company';
 
@@ -52,7 +53,22 @@ export default function SignupForm() {
 
   return (
     <form onSubmit={submit} className="bg-white border border-stone-200 rounded-2xl p-6 space-y-4 shadow-sm">
-      <div className="grid grid-cols-2 gap-2">
+      <GoogleButton intendedRole={role} label="Zarejestruj przez Google" />
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-stone-200" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-white px-2 text-[11px] uppercase tracking-wide text-stone-400">lub e-mailem</span>
+        </div>
+      </div>
+
+      <div
+        className="grid grid-cols-2 gap-2"
+        role="radiogroup"
+        aria-label="Wybierz typ konta"
+      >
         <button
           type="button"
           onClick={() => setRole('family')}

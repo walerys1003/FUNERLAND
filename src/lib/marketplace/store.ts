@@ -462,6 +462,43 @@ export const condolenceStore = {
     }
     return null;
   },
+  /** Cross-obituary list of pending items (admin moderation queue) */
+  listPending(): (Condolence & { obituarySlug?: string; obituaryName?: string })[] {
+    const out: any[] = [];
+    for (const [obituaryId, list] of store.condolences.entries()) {
+      const obit = store.obituaries.get(obituaryId);
+      for (const c of list) {
+        if (c.status !== 'pending') continue;
+        const { ...copy } = c;
+        delete (copy as any)._ipHash;
+        out.push({
+          ...copy,
+          obituarySlug: obit?.slug,
+          obituaryName: obit?.personName,
+        });
+      }
+    }
+    return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  /** Cross-obituary recent (all statuses) */
+  listRecent(limit = 50): any[] {
+    const out: any[] = [];
+    for (const [obituaryId, list] of store.condolences.entries()) {
+      const obit = store.obituaries.get(obituaryId);
+      for (const c of list) {
+        const { ...copy } = c;
+        delete (copy as any)._ipHash;
+        out.push({
+          ...copy,
+          obituarySlug: obit?.slug,
+          obituaryName: obit?.personName,
+        });
+      }
+    }
+    return out
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  },
 };
 
 // ─── Memory wall store (photos + stories) ────────────────────────────────
@@ -525,6 +562,23 @@ export const memoryStore = {
       }
     }
     return null;
+  },
+  listPending(): (Memory & { obituarySlug?: string; obituaryName?: string })[] {
+    const out: any[] = [];
+    for (const [obituaryId, list] of store.memories.entries()) {
+      const obit = store.obituaries.get(obituaryId);
+      for (const m of list) {
+        if (m.status !== 'pending') continue;
+        const { ...copy } = m;
+        delete (copy as any)._ipHash;
+        out.push({
+          ...copy,
+          obituarySlug: obit?.slug,
+          obituaryName: obit?.personName,
+        });
+      }
+    }
+    return out.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 };
 

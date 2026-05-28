@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
           '/admin/',
           '/panel-firmy/',
           '/panel-rodziny/',
+          '/konto',
           '/api/',
           '/orchestrator',
           '/design-system',

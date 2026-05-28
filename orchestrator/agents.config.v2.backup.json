@@ -1,0 +1,196 @@
+{
+  "project": "PolskiePogrzeby.pl — Enterprise Funeral-Tech Marketplace",
+  "version": "2.0",
+  "totalTasks": 1000,
+  "agents": [
+    {
+      "id": "builder",
+      "name": "Agent 1 — Master Builder",
+      "role": "Senior Full-stack Next.js + Supabase",
+      "prompt": "PROMPT 1 — Master Builder MVP",
+      "color": "#2E4F3E",
+      "icon": "Hammer",
+      "tools": ["Next.js 15", "Supabase", "TypeScript", "PostgreSQL", "Stripe", "Resend"],
+      "taskCount": 150,
+      "deliverables": [
+        "Supabase schema (15+ tabel + RLS + triggery + audit logs)",
+        "Seed data (7 miast, 8 kategorii, 30+ firm)",
+        "API routes (auth, leads, claim, bookings, payments, reviews, webhooks)",
+        "Lead routing algorithm + scoring",
+        "Auth flow (Supabase Auth + Google + Facebook)",
+        "Stripe billing (4 plany) + Przelewy24 + BLIK",
+        "Mailing (Resend) + SMS (SMSAPI.pl) + Twilio",
+        ".env.example + Docker Compose + deployment configs"
+      ]
+    },
+    {
+      "id": "designer",
+      "name": "Agent 2 — Design System",
+      "role": "Senior Product Designer",
+      "prompt": "PROMPT 2 — Design System & UI Components",
+      "color": "#C9A65F",
+      "icon": "Palette",
+      "tools": ["TailwindCSS", "shadcn/ui", "Lucide", "Lora", "Inter", "Framer Motion"],
+      "taskCount": 100,
+      "deliverables": [
+        "Design tokens (CSS variables + Tailwind config)",
+        "12+ komponenty UI (Button, Card, Form, Search, Filters, Calculator, Company Card, Profile, Dashboard, Empty, Modal, Booking Stepper)",
+        "10 custom ikon (chłodnia, trumna, urna, krematorium, ceremonia, transmisja, transport, nagrobek, świeca, kwiat)",
+        "Photography moodboard + ilustracje",
+        "Micro-interactions + animations (Framer Motion)",
+        "Accessibility WCAG 2.1 AA"
+      ]
+    },
+    {
+      "id": "content",
+      "name": "Agent 3 — Content Generator",
+      "role": "Empatyczny copywriter funeralny",
+      "prompt": "PROMPT 3 — 8 Artykułów + Microcopy",
+      "color": "#0F1B2D",
+      "icon": "PenLine",
+      "tools": ["Markdown", "FAQ Schema", "JSON-LD"],
+      "taskCount": 80,
+      "deliverables": [
+        "8 artykułów filarowych (1500-2000 słów każdy)",
+        "Microcopy form + komunikatów + emaili",
+        "Empty states + error messages (empathy-first)",
+        "FAQ schema dla każdej kategorii",
+        "Polityka prywatności + Regulamin + RODO"
+      ]
+    },
+    {
+      "id": "outreach",
+      "name": "Agent 4 — Cold Outreach",
+      "role": "Direct Response Copywriter B2B",
+      "prompt": "PROMPT 4 — Cold Email Sequence",
+      "color": "#9B8050",
+      "icon": "Mail",
+      "tools": ["Email", "SMS", "Phone scripts", "LinkedIn"],
+      "taskCount": 60,
+      "deliverables": [
+        "4 cold emaile (dzień 0, 3, 7, 14)",
+        "3 SMS (dla firm bez emaila)",
+        "Skrypt rozmowy telefonicznej (1 min + 5 min)",
+        "5 obiekcji z gotowymi odpowiedziami",
+        "3 warianty subject line do A/B testu",
+        "LinkedIn outreach templates (3 wiadomości)"
+      ]
+    },
+    {
+      "id": "seo",
+      "name": "Agent 5 — Programmatic SEO",
+      "role": "SEO Content Engineer",
+      "prompt": "PROMPT 5 — Programmatic SEO Generator",
+      "color": "#2E7D5B",
+      "icon": "TrendingUp",
+      "tools": ["Next.js SSG", "JSON-LD", "Sitemap", "Schema.org", "GSC"],
+      "taskCount": 120,
+      "deliverables": [
+        "40+ stron city×category (5 miast × 8 kategorii)",
+        "Dynamic H1 rotation (5 wariantów)",
+        "Local context generator (cmentarze, USC, parafie, krematoria)",
+        "FAQ schema dla każdego miasta",
+        "sitemap.xml + robots.txt + sitemap-index",
+        "JSON-LD (LocalBusiness, FAQPage, BreadcrumbList, Review, Service)",
+        "Core Web Vitals optimization"
+      ]
+    },
+    {
+      "id": "gtm",
+      "name": "Agent 6 — Go-To-Market",
+      "role": "GTM Strategist & Growth",
+      "prompt": "PROMPT 6 — GTM 30-day Plan",
+      "color": "#C68B3C",
+      "icon": "Rocket",
+      "tools": ["Plausible", "Analytics", "Launch Checklist"],
+      "taskCount": 60,
+      "deliverables": [
+        "Launch checklist (14 dni)",
+        "GTM plan 30-dniowy",
+        "Analytics events (Plausible) + UTM",
+        "PR plan + media outreach",
+        "Plan akwizycji B2B 500 firm",
+        "KPI dashboard"
+      ]
+    },
+    {
+      "id": "search",
+      "name": "Agent 7 — Search Engine",
+      "role": "Search & Discovery Engineer",
+      "prompt": "PROMPT 7 — Meilisearch Marketplace Search",
+      "color": "#8B5CF6",
+      "icon": "Search",
+      "tools": ["Meilisearch", "Typesense", "PostgreSQL FTS", "Algolia"],
+      "taskCount": 100,
+      "deliverables": [
+        "Meilisearch schema (index: companies, services, obituaries, articles)",
+        "Sync workers Postgres → Meilisearch",
+        "Search-as-you-type API + autocomplete",
+        "Multi-filter API (miasto, kategoria, cena, ocena, 24/7)",
+        "Geo search (radius od punktu)",
+        "Search results page UI z map view + list view",
+        "Synonimy + typo tolerance + spell-correct",
+        "Search analytics (zero-results, top queries)"
+      ]
+    },
+    {
+      "id": "marketplace",
+      "name": "Agent 8 — Marketplace & Booking",
+      "role": "Marketplace Product Engineer",
+      "prompt": "PROMPT 8 — Multi-category Marketplace + Online Booking",
+      "color": "#EC4899",
+      "icon": "ShoppingBag",
+      "tools": ["Next.js", "Stripe", "Calendar", "Booking flow"],
+      "taskCount": 150,
+      "deliverables": [
+        "Profile firm dla 5 kategorii (pogrzebowe, kwiaciarnie, kamieniarze, transport, krematoria)",
+        "Booking flow 6-step (usługa → termin → dane → opcje → płatność → potwierdzenie)",
+        "Calendar UI z dostępnością dostawcy",
+        "Cart + checkout + faktury",
+        "Płatności: Stripe Card, BLIK, P24, przelew",
+        "Email + SMS confirmations",
+        "Profil użytkownika: rezerwacje, dokumenty, ulubione",
+        "Profil firmy: zarządzanie ofertami, kalendarz, rezerwacje"
+      ]
+    },
+    {
+      "id": "ai",
+      "name": "Agent 9 — AI Assistant",
+      "role": "AI Engineer (LLM + RAG)",
+      "prompt": "PROMPT 9 — AI Funeral Assistant",
+      "color": "#06B6D4",
+      "icon": "Sparkles",
+      "tools": ["OpenAI gpt-4o-mini", "Embeddings", "Vector DB", "Streaming"],
+      "taskCount": 80,
+      "deliverables": [
+        "AI Funeral Planner (chat) — empatyczny asystent",
+        "AI Matching — dopasowanie firm do potrzeb",
+        "AI Content (programmatic SEO description generator)",
+        "AI Summaries (opinie firmy w 1 zdaniu)",
+        "AI FAQ generator per firma",
+        "Grief-safe content guardrails (no sales pressure)",
+        "Streaming responses + token economy"
+      ]
+    },
+    {
+      "id": "devops",
+      "name": "Agent 10 — DevOps & Self-Host",
+      "role": "Senior DevOps / SRE",
+      "prompt": "PROMPT 10 — Docker + Self-Hosted Supabase + CI/CD",
+      "color": "#10B981",
+      "icon": "Server",
+      "tools": ["Docker", "Coolify", "Traefik", "MinIO", "Redis", "Cloudflare", "GitHub Actions"],
+      "taskCount": 100,
+      "deliverables": [
+        "docker-compose.yml (Next.js + Supabase + Meilisearch + Redis + MinIO)",
+        "Self-hosted Supabase config (Studio + Kong + Postgres + Realtime)",
+        "Traefik reverse proxy z SSL (Let's Encrypt)",
+        "GitHub Actions CI/CD (lint, build, deploy)",
+        "Backup strategy (Postgres + MinIO daily snapshots)",
+        "Monitoring (Uptime Kuma + Grafana)",
+        "Rate limiting + DDoS protection (Cloudflare)",
+        "Staging + production environments"
+      ]
+    }
+  ]
+}

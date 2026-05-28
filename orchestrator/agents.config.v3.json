@@ -1,0 +1,290 @@
+{
+  "project": "PolskiePogrzeby.pl — Production Readiness Push",
+  "version": "3.0",
+  "phase": "Phase 3 — Path to Production",
+  "totalTasks": 1000,
+  "agents": [
+    {
+      "id": "builder",
+      "name": "Agent 1 — Master Builder",
+      "role": "Senior Full-stack Next.js + Supabase",
+      "prompt": "PROMPT 1 — Auth, panele, billing, transakcje",
+      "color": "#2E4F3E",
+      "icon": "Hammer",
+      "tools": [
+        "Next.js 15",
+        "Supabase Auth",
+        "Stripe",
+        "Przelewy24",
+        "BullMQ"
+      ],
+      "taskCount": 170,
+      "deliverables": [
+        "Full Supabase Auth flow (email+password, OAuth, magic link, 2FA)",
+        "Middleware ochrony tras /panel-*, /admin, session refresh",
+        "Panel Firmy: dashboard, leady, profil, billing, zespół, statystyki, recenzje, ustawienia, onboarding",
+        "Panel Rodziny: zapytania, oferty, wiadomości (realtime), recenzje, dokumenty",
+        "Panel Admin: firmy, leady, recenzje moderacja, użytkownicy, transakcje, content CMS, audit log",
+        "Stripe Checkout (subscription, lead-unlock, obituary-premium)",
+        "Przelewy24 + BLIK integration (init, notify, verify)",
+        "Faktury PDF + JPK_VAT export"
+      ]
+    },
+    {
+      "id": "designer",
+      "name": "Agent 2 — Design System",
+      "role": "Senior Product Designer",
+      "prompt": "PROMPT 2 — UI components dla paneli + dark mode + a11y",
+      "color": "#C9A65F",
+      "icon": "Palette",
+      "tools": [
+        "TailwindCSS",
+        "shadcn/ui",
+        "Framer Motion",
+        "axe-core"
+      ],
+      "taskCount": 90,
+      "deliverables": [
+        "Komponenty panelu firmy (Table, Tabs, Stats, Charts, Modals, Drawers)",
+        "Komponenty panelu rodziny (Comparison, Timeline, Messages)",
+        "Komponenty admina (DataTable, BulkActions, FilterBar)",
+        "Dark mode toggle (CSS variables)",
+        "Animations (Framer Motion: stagger, parallax, scroll-triggered)",
+        "Empty states + error states + loading skeletons (wszystkie widoki)",
+        "Accessibility WCAG 2.1 AA audit + fixes"
+      ]
+    },
+    {
+      "id": "content",
+      "name": "Agent 3 — Content Generator",
+      "role": "Empatyczny copywriter funeralny + SEO",
+      "prompt": "PROMPT 3 — +12 artykułów, FAQ db, glossary, video scripts",
+      "color": "#0F1B2D",
+      "icon": "PenLine",
+      "tools": [
+        "Markdown",
+        "Frontmatter",
+        "OpenAI assist",
+        "Hemingway"
+      ],
+      "taskCount": 70,
+      "deliverables": [
+        "+12 artykułów SEO (cel: 20 total)",
+        "FAQ database (50+ pytań/odpowiedzi z tagami)",
+        "Glossary terminów funeralnych (80+ haseł)",
+        "Video tutorial scripts (10 video, 90-120s each)",
+        "PDF lead magnets (Lista dokumentów, Checklist pogrzebowy)",
+        "Email templates HTML (15 transactional + 5 marketing)",
+        "Microcopy audit (CTA, errors, empty states)"
+      ]
+    },
+    {
+      "id": "outreach",
+      "name": "Agent 4 — Outreach Engine",
+      "role": "B2B Growth Hacker",
+      "prompt": "PROMPT 4 — Drip campaigns, partner outreach, PR kit",
+      "color": "#A89F7E",
+      "icon": "Mail",
+      "tools": [
+        "Apollo",
+        "Hunter",
+        "Resend",
+        "SMSAPI",
+        "LinkedIn Sales Nav"
+      ],
+      "taskCount": 50,
+      "deliverables": [
+        "Drip campaign sekwencja 10-emaili dla firm (90 dni)",
+        "Partner outreach do stowarzyszeń branżowych (PSP, KOP)",
+        "PR kit (one-pager, press release templates, founder bio)",
+        "Influencer outreach do mikro-influencerów lokalnych",
+        "ICP cold list 1000 zakładów (NIP, email, telefon, decision-maker)",
+        "LinkedIn content calendar (3 posty/tydz., 12 tyg.)"
+      ]
+    },
+    {
+      "id": "seo",
+      "name": "Agent 5 — SEO Beast",
+      "role": "Senior SEO Specialist",
+      "prompt": "PROMPT 5 — Rich snippets, AMP, hreflang, performance",
+      "color": "#C9A65F",
+      "icon": "TrendingUp",
+      "tools": [
+        "Schema.org",
+        "Screaming Frog",
+        "Lighthouse",
+        "Ahrefs"
+      ],
+      "taskCount": 90,
+      "deliverables": [
+        "Rich snippets validation (FAQ, HowTo, Review, FuneralHome)",
+        "AMP wersje dla artykułów",
+        "Hreflang PL/EN (jeśli expansion)",
+        "OG image generator (`/api/og?title=...&type=article`)",
+        "Internal linking optimizer (artykuł → 5 related)",
+        "Local SEO: Google Business Profile, NAP consistency, GBP API",
+        "Backlink monitoring + outreach (HARO, brand mentions)",
+        "Core Web Vitals monitoring + auto-alerts"
+      ]
+    },
+    {
+      "id": "gtm",
+      "name": "Agent 6 — Go-To-Market",
+      "role": "Head of Growth",
+      "prompt": "PROMPT 6 — A/B testing, retention, NPS",
+      "color": "#7C3AED",
+      "icon": "Rocket",
+      "tools": [
+        "Plausible",
+        "PostHog",
+        "Vitals",
+        "Customer.io"
+      ],
+      "taskCount": 50,
+      "deliverables": [
+        "A/B testing framework (PostHog feature flags)",
+        "Retention campaigns (win-back, reactivation)",
+        "NPS automation (po booking → 3-pytaniowy survey)",
+        "Cohort analysis dashboard",
+        "Referral program (rodzina poleca firmę → benefity)",
+        "Loyalty program dla firm (po 12 m-c → upgrade)"
+      ]
+    },
+    {
+      "id": "search",
+      "name": "Agent 7 — Search Engine",
+      "role": "Search & Discovery Engineer",
+      "prompt": "PROMPT 7 — Geo search, autocomplete, map view, analytics",
+      "color": "#8B5CF6",
+      "icon": "Search",
+      "tools": [
+        "Meilisearch",
+        "PostGIS",
+        "Leaflet",
+        "MapTiler"
+      ],
+      "taskCount": 80,
+      "deliverables": [
+        "Geo-search w promieniu X km (PostGIS + Meili _geo)",
+        "Autocomplete (search-as-you-type, debounced)",
+        "Map view (Leaflet + clustering)",
+        "Filter facets (rating range, budget range, services)",
+        "Search analytics → search_logs table + admin dashboard",
+        "Synonimy PL rozszerzone (200+ par)",
+        "Misspell correction",
+        "URL state filters (sharable links)"
+      ]
+    },
+    {
+      "id": "marketplace",
+      "name": "Agent 8 — Marketplace & Booking",
+      "role": "Marketplace Architect",
+      "prompt": "PROMPT 8 — Calendar, messaging, nekrologi, recenzje",
+      "color": "#EC4899",
+      "icon": "ShoppingBag",
+      "tools": [
+        "Supabase Realtime",
+        "iCal",
+        "Stripe",
+        "Tiptap"
+      ],
+      "taskCount": 140,
+      "deliverables": [
+        "Real-time availability calendar (Supabase Realtime + RPC)",
+        "iCal/Google Calendar sync dla firm",
+        "Booking modify + cancel + reminder (email/SMS 24h/1h)",
+        "Messaging system (rodzina ↔ firma) z Supabase Realtime",
+        "Nekrolog premium: video embed, gallery, mapa, świece, RSVP",
+        "Recenzje pełne: 5-step form, verified badge, helpfulness, response, anti-fake",
+        "Lead unlock flow (Stripe one-time)",
+        "Multi-funeral support w panelu rodziny"
+      ]
+    },
+    {
+      "id": "ai",
+      "name": "Agent 9 — AI Assistant",
+      "role": "AI Product Engineer",
+      "prompt": "PROMPT 9 — Streaming, embeddings, multilingual, voice",
+      "color": "#06B6D4",
+      "icon": "Sparkles",
+      "tools": [
+        "OpenAI",
+        "Anthropic",
+        "pgvector",
+        "Whisper",
+        "ElevenLabs"
+      ],
+      "taskCount": 90,
+      "deliverables": [
+        "Streaming odpowiedzi (SSE/EventStream)",
+        "Multi-turn memory w Supabase (ai_sessions, ai_messages)",
+        "Embeddings dla artykułów + companies (pgvector)",
+        "Semantic search via embeddings",
+        "Funkcja `generuj nekrolog` w czacie",
+        "Funkcja `porównaj oferty` (parsing + summary)",
+        "Voice input (Web Speech API) + voice output (ElevenLabs)",
+        "Multilingual PL/EN/UA (auto-detect)",
+        "Cost monitoring (per-session token tracking)",
+        "Safety: crisis detection, sentiment, escalation"
+      ]
+    },
+    {
+      "id": "devops",
+      "name": "Agent 10 — DevOps & Security",
+      "role": "Senior SRE + Security",
+      "prompt": "PROMPT 10 — Monitoring, alerts, security hardening, DR",
+      "color": "#10B981",
+      "icon": "Server",
+      "tools": [
+        "Cloudflare",
+        "Sentry",
+        "Grafana",
+        "k6",
+        "Trivy"
+      ],
+      "taskCount": 110,
+      "deliverables": [
+        "CSP, HSTS, X-Frame-Options w next.config.mjs",
+        "Cloudflare Turnstile CAPTCHA na publicznych formularzach",
+        "Rate limiting prod (Upstash Redis)",
+        "Sentry full integration (errors + performance + sourcemaps)",
+        "Grafana dashboards (Postgres + Meili + app metrics)",
+        "Uptime Kuma + PagerDuty escalation",
+        "Backup verify (auto-restore test co tydzień)",
+        "DR runbook + RTO/RPO testing",
+        "Container security scan (Trivy w CI)",
+        "Pen-test OWASP Top 10",
+        "Load test k6: 1000 RPS sustained",
+        "Secrets rotation procedure"
+      ]
+    },
+    {
+      "id": "qa",
+      "name": "Agent 11 — QA & Testing",
+      "role": "Senior QA Engineer",
+      "prompt": "PROMPT 11 — Unit, integration, E2E, a11y, visual, load tests",
+      "color": "#F59E0B",
+      "icon": "TestTube",
+      "tools": [
+        "Vitest",
+        "Playwright",
+        "axe-core",
+        "Percy",
+        "k6"
+      ],
+      "taskCount": 60,
+      "deliverables": [
+        "Vitest config + unit tests dla libs (articles, json-ld, marketplace/categories, ai/prompts, search/meilisearch)",
+        "Integration tests dla API routes (lead, claim, booking, search, ai/chat)",
+        "Playwright E2E (10 critical paths: lead flow, booking, claim, search, panel-firmy)",
+        "Visual regression tests (Percy/Chromatic)",
+        "Accessibility tests (axe-core w Playwright)",
+        "Load tests k6 (1000 RPS, 95p <500ms)",
+        "Test data factory (TestFactory pattern)",
+        "Mock services (MSW dla API mocking)",
+        "Mutation testing (Stryker)",
+        "Coverage gates: ≥80% statements, ≥75% branches"
+      ]
+    }
+  ]
+}

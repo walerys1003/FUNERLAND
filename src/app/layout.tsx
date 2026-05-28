@@ -4,6 +4,7 @@ import './globals.css';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
 import ChatWidget from '@/components/ai/chat-widget';
+import { ToastProvider } from '@/components/ui/toast';
 import { organizationJsonLd, websiteJsonLd } from '@/lib/seo/json-ld';
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'], variable: '--font-inter', display: 'swap' });
@@ -28,10 +29,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
         />
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
-        <ChatWidget />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-navy focus:text-white focus:px-4 focus:py-2 focus:rounded-md focus:shadow-card focus:outline-none"
+        >
+          Przejdź do treści
+        </a>
+        <ToastProvider>
+          <SiteHeader />
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+          <SiteFooter />
+          <ChatWidget />
+        </ToastProvider>
       </body>
     </html>
   );

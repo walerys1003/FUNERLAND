@@ -102,6 +102,9 @@ class InMemoryStore {
   reviews = new Map<string, Review>();
   obituaries = new Map<string, Obituary>();
   candlesByObituary = new Map<string, Set<string>>(); // dedupe by IP
+  condolences = new Map<string, Condolence[]>(); // obituaryId -> condolences
+  memories = new Map<string, Memory[]>(); // obituaryId -> memories (photos/stories)
+  condolencesByIp = new Map<string, Map<string, number>>(); // obituaryId -> (ipHash -> lastTs)
 
   // helpers
   list<T>(map: Map<string, T>, filter?: (v: T) => boolean): T[] {
@@ -299,6 +302,34 @@ export const reviewStore = {
   },
 };
 
+// ─── Condolence book + Memory wall types ─────────────────────────────────
+export type Condolence = {
+  id: string;
+  obituaryId: string;
+  authorName: string;
+  text: string;
+  /** Optional relationship to deceased ("syn", "przyjaciel", "współpracownik"…) */
+  relation?: string;
+  /** Moderation status — public list only shows 'approved' */
+  status: 'approved' | 'pending' | 'rejected';
+  createdAt: string;
+};
+
+export type Memory = {
+  id: string;
+  obituaryId: string;
+  type: 'photo' | 'story';
+  /** For 'photo': image URL; for 'story': caption/headline */
+  title: string;
+  /** Full description / story text (for 'story' or photo caption) */
+  description?: string;
+  /** Image URL (only photo type) */
+  imageUrl?: string;
+  authorName: string;
+  status: 'approved' | 'pending' | 'rejected';
+  createdAt: string;
+};
+
 export const obituaryStore = {
   publish(o: Omit<Obituary, 'id' | 'createdAt' | 'status' | 'candles' | 'slug'>) {
     const id = newId('OBI');
@@ -333,6 +364,167 @@ export const obituaryStore = {
     store.candlesByObituary.set(obituaryId, set);
     o.candles++;
     return { ok: true, candles: o.candles };
+  },
+};
+
+// ─── Condolence book store ───────────────────────────────────────────────
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute between posts from same IP
+const RATE_LIMIT_DAILY = 5; // max 5 per IP per 24h per obituary (counted on the cap)
+
+export const condolenceStore = {
+  /** Add a condolence; auto-status = 'approved' (with light heuristics) or 'pending'. */
+  add(input: {
+    obituarySlug: string;
+    authorName: string;
+    text: string;
+    relation?: string;
+    ipHash: string;
+  }): { ok: true; condolence: Condolence } | { ok: false; error: string } {
+    const obit = store.list(store.obituaries, (o) => o.slug === input.obituarySlug)[0];
+    if (!obit) return { ok: false, error: 'Nie znaleziono nekrologu' };
+
+    // Rate limit per IP per obituary
+    const ipMap = store.condolencesByIp.get(obit.id) || new Map<string, number>();
+    const now = Date.now();
+    const lastTs = ipMap.get(input.ipHash) || 0;
+    if (now - lastTs < RATE_LIMIT_WINDOW_MS) {
+      return { ok: false, error: 'Poczekaj chwilę przed kolejnym wpisem' };
+    }
+    // Daily cap from same IP
+    const allFromIp = (store.condolences.get(obit.id) || []).filter(
+      (c) => (c as any)._ipHash === input.ipHash && now - new Date(c.createdAt).getTime() < 86_400_000,
+    );
+    if (allFromIp.length >= RATE_LIMIT_DAILY) {
+      return { ok: false, error: 'Dzienny limit kondolencji z tego adresu został osiągnięty' };
+    }
+
+    // Simple spam heuristics → mark as pending if suspicious
+    const t = input.text.trim();
+    const susceptToSpam =
+      /https?:\/\//i.test(t) || // contains URL
+      /\b(viagra|casino|kredyt|bitcoin)\b/i.test(t) ||
+      t.length < 8;
+
+    const id = newId('CND');
+    const rec: Condolence = {
+      id,
+      obituaryId: obit.id,
+      authorName: input.authorName.trim().slice(0, 80),
+      text: t.slice(0, 1000),
+      relation: input.relation?.trim().slice(0, 60),
+      status: susceptToSpam ? 'pending' : 'approved',
+      createdAt: new Date().toISOString(),
+    };
+    // Tag with ipHash for rate-limiting (not exposed publicly)
+    (rec as any)._ipHash = input.ipHash;
+
+    const list = store.condolences.get(obit.id) || [];
+    list.push(rec);
+    store.condolences.set(obit.id, list);
+    ipMap.set(input.ipHash, now);
+    store.condolencesByIp.set(obit.id, ipMap);
+
+    return { ok: true, condolence: rec };
+  },
+  /** Public list — only approved condolences, newest first. */
+  listForSlug(obituarySlug: string): Condolence[] {
+    const obit = store.list(store.obituaries, (o) => o.slug === obituarySlug)[0];
+    if (!obit) return [];
+    const list = store.condolences.get(obit.id) || [];
+    return list
+      .filter((c) => c.status === 'approved')
+      .map(({ ...c }) => {
+        // strip internal _ipHash
+        delete (c as any)._ipHash;
+        return c;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  /** Admin/moderation list — includes pending */
+  listAllForSlug(obituarySlug: string): Condolence[] {
+    const obit = store.list(store.obituaries, (o) => o.slug === obituarySlug)[0];
+    if (!obit) return [];
+    return (store.condolences.get(obit.id) || [])
+      .map(({ ...c }) => {
+        delete (c as any)._ipHash;
+        return c;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  /** Moderate — approve/reject by id */
+  setStatus(id: string, status: 'approved' | 'rejected'): Condolence | null {
+    for (const list of store.condolences.values()) {
+      const c = list.find((x) => x.id === id);
+      if (c) {
+        c.status = status;
+        return c;
+      }
+    }
+    return null;
+  },
+};
+
+// ─── Memory wall store (photos + stories) ────────────────────────────────
+export const memoryStore = {
+  add(input: {
+    obituarySlug: string;
+    type: 'photo' | 'story';
+    title: string;
+    description?: string;
+    imageUrl?: string;
+    authorName: string;
+    ipHash: string;
+  }): { ok: true; memory: Memory } | { ok: false; error: string } {
+    const obit = store.list(store.obituaries, (o) => o.slug === input.obituarySlug)[0];
+    if (!obit) return { ok: false, error: 'Nie znaleziono nekrologu' };
+
+    if (input.type === 'photo' && !input.imageUrl) {
+      return { ok: false, error: 'Brak adresu zdjęcia' };
+    }
+    if (input.type === 'story' && (!input.description || input.description.length < 20)) {
+      return { ok: false, error: 'Historia musi mieć co najmniej 20 znaków' };
+    }
+
+    const id = newId('MEM');
+    const rec: Memory = {
+      id,
+      obituaryId: obit.id,
+      type: input.type,
+      title: input.title.trim().slice(0, 120),
+      description: input.description?.trim().slice(0, 2000),
+      imageUrl: input.imageUrl,
+      authorName: input.authorName.trim().slice(0, 80),
+      status: 'pending', // photos require moderation
+      createdAt: new Date().toISOString(),
+    };
+    (rec as any)._ipHash = input.ipHash;
+
+    const list = store.memories.get(obit.id) || [];
+    list.push(rec);
+    store.memories.set(obit.id, list);
+    return { ok: true, memory: rec };
+  },
+  listForSlug(obituarySlug: string, opts?: { includePending?: boolean }): Memory[] {
+    const obit = store.list(store.obituaries, (o) => o.slug === obituarySlug)[0];
+    if (!obit) return [];
+    const list = store.memories.get(obit.id) || [];
+    return list
+      .filter((m) => opts?.includePending || m.status === 'approved')
+      .map(({ ...m }) => {
+        delete (m as any)._ipHash;
+        return m;
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  setStatus(id: string, status: 'approved' | 'rejected'): Memory | null {
+    for (const list of store.memories.values()) {
+      const m = list.find((x) => x.id === id);
+      if (m) {
+        m.status = status;
+        return m;
+      }
+    }
+    return null;
   },
 };
 

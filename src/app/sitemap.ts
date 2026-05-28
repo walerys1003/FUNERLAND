@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { cities, categories, companies, articles, obituaries } from '@/lib/data';
-import { getAllArticles } from '@/lib/articles';
+import { getAllArticles, getCategories } from '@/lib/articles';
+import { CITY_SLUGS, TOOL_SLUGS } from '@/lib/content/local-tool-content';
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://polskiepogrzeby.pl';
 
@@ -43,6 +44,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'monthly' as const,
     priority: t.priority,
   }));
+
+  // ---- Programmatic SEO: /narzedzia/[tool]/[city] (TOOL_SLUGS × CITY_SLUGS) ----
+  const toolCityPages: MetadataRoute.Sitemap = TOOL_SLUGS.flatMap((tool) =>
+    CITY_SLUGS.map((city) => ({
+      url: `${BASE_URL}/narzedzia/${tool}/${city}`,
+      lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: 0.75,
+    })),
+  );
+
+  // ---- Articles category landing pages ----
+  let articleCategoryPages: MetadataRoute.Sitemap = [];
+  try {
+    const cats = getCategories();
+    articleCategoryPages = cats.map((c) => ({
+      url: `${BASE_URL}/poradnik/kategoria/${c.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    }));
+  } catch {
+    /* ignore */
+  }
 
   // Old /kalkulator stays in sitemap as legacy
   staticPages.push({
@@ -113,11 +138,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPages,
     ...toolsPages,
+    ...toolCityPages,
     ...cityPages,
     ...cityCategoryPages,
     ...categoryPages,
     ...companyPages,
     ...articlePages,
+    ...articleCategoryPages,
     ...obituaryPages,
   ];
 }

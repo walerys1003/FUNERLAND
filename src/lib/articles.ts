@@ -98,6 +98,47 @@ export function getAllArticles(): Article[] {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+/** All unique categories used across MD frontmatter, with article counts. */
+export function getCategories(): Array<{ slug: string; name: string; count: number }> {
+  const map = new Map<string, number>();
+  for (const a of getAllArticles()) {
+    if (!a.category) continue;
+    map.set(a.category, (map.get(a.category) || 0) + 1);
+  }
+  const labels: Record<string, string> = {
+    poradnik: 'Poradnik',
+    cennik: 'Cennik i koszty',
+    kremacja: 'Kremacja',
+    dokumenty: 'Dokumenty',
+    ceremonie: 'Ceremonie',
+    procedura: 'Procedury',
+    formalnosci: 'Formalności',
+    koszty: 'Koszty',
+  };
+  return Array.from(map.entries())
+    .map(([slug, count]) => ({ slug, name: labels[slug] || slug, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** Articles within a given category slug (case-insensitive). */
+export function getArticlesByCategory(slug: string): Article[] {
+  const target = slug.toLowerCase();
+  return getAllArticles().filter((a) => (a.category || '').toLowerCase() === target);
+}
+
+/**
+ * Naive "related articles" selector — same category first, then date proximity.
+ * Excludes the source article itself.
+ */
+export function getRelatedArticles(slug: string, limit = 3): Article[] {
+  const source = getArticle(slug);
+  if (!source) return [];
+  const all = getAllArticles().filter((a) => a.slug !== slug);
+  const sameCat = all.filter((a) => a.category === source.category);
+  const others = all.filter((a) => a.category !== source.category);
+  return [...sameCat, ...others].slice(0, limit);
+}
+
 /**
  * Bardzo prosty markdown renderer.
  * Obsługuje: # ## ###, **bold**, *italic*, [link](url), ![img](url),

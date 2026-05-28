@@ -1,7 +1,19 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, User, ArrowLeft, Calendar } from 'lucide-react';
-import { getArticle, getArticleSlugs, renderMarkdown } from '@/lib/articles';
+import { Clock, User, ArrowLeft, Calendar, ArrowRight } from 'lucide-react';
+import {
+  getArticle,
+  getArticleSlugs,
+  renderMarkdown,
+  getRelatedArticles,
+} from '@/lib/articles';
+import Breadcrumbs from '@/components/seo/breadcrumbs';
+import JsonLd from '@/components/seo/json-ld';
+import {
+  articleJsonLd,
+  webPageJsonLd,
+  combineJsonLd,
+} from '@/lib/seo/json-ld';
 
 export async function generateStaticParams() {
   return getArticleSlugs().map((slug) => ({ slug }));
@@ -14,12 +26,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: `${article.title} | Polskie Pogrzeby`,
     description: article.metaDescription,
+    alternates: { canonical: `/poradnik/${slug}` },
     openGraph: {
       title: article.title,
       description: article.metaDescription,
       type: 'article',
       publishedTime: article.date,
       authors: [article.author],
+      url: `/poradnik/${slug}`,
+      images: [
+        {
+          url: `/api/og?title=${encodeURIComponent(article.title)}&subtitle=${encodeURIComponent(article.author || 'Poradnik')}&type=article`,
+          width: 1200,
+          height: 630,
+        },
+      ],
     },
   };
 }
@@ -33,11 +54,51 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     ? article.tldr.split('\n').filter((l) => l.trim().startsWith('-'))
     : [];
 
+  const related = getRelatedArticles(slug, 3);
+
+  const jsonLd = combineJsonLd(
+    articleJsonLd({
+      slug,
+      title: article.title,
+      description: article.metaDescription,
+      date: article.date,
+      author: article.author,
+      authorRole: article.authorRole,
+      readingTime: article.readingTime,
+    }),
+    webPageJsonLd({
+      name: article.title,
+      description: article.metaDescription,
+      url: `/poradnik/${slug}`,
+      datePublished: article.date,
+      dateModified: article.date,
+      breadcrumb: [
+        { name: 'Strona główna', url: '/' },
+        { name: 'Poradnik', url: '/poradnik' },
+        { name: article.title, url: `/poradnik/${slug}` },
+      ],
+    }),
+  );
+
   return (
     <article className="bg-cream">
+      <JsonLd data={jsonLd} />
+
       {/* Hero */}
       <header className="border-b border-border-soft bg-white/40">
-        <div className="container-page py-12">
+        <div className="container-page py-6">
+          <Breadcrumbs
+            items={[
+              { name: 'Poradnik', url: '/poradnik' },
+              ...(article.category
+                ? [{ name: article.category, url: `/poradnik/kategoria/${article.category.toLowerCase()}` }]
+                : []),
+              { name: article.title, url: `/poradnik/${slug}` },
+            ]}
+            className="mb-2"
+          />
+        </div>
+        <div className="container-page pb-12">
           <Link
             href="/poradnik"
             className="inline-flex items-center gap-2 text-sm text-navy/60 hover:text-navy mb-6"
@@ -129,31 +190,29 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
               <TocFromMarkdown content={article.content} />
             </div>
 
-            <div className="card">
-              <h4 className="font-heading text-lg text-navy mb-3">Inne poradniki</h4>
-              <ul className="space-y-3 text-sm">
-                <li>
-                  <Link href="/poradnik/ile-kosztuje-pogrzeb-w-polsce-2026" className="text-navy/80 hover:text-accent-green">
-                    Ile kosztuje pogrzeb w 2026?
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/poradnik/zasilek-pogrzebowy-zus-2026" className="text-navy/80 hover:text-accent-green">
-                    Zasiłek pogrzebowy ZUS 2026
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/poradnik/kremacja-w-polsce-koszty" className="text-navy/80 hover:text-accent-green">
-                    Kremacja w Polsce — koszty
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/poradnik/lista-dokumentow-do-pogrzebu" className="text-navy/80 hover:text-accent-green">
-                    Lista dokumentów do pogrzebu
-                  </Link>
-                </li>
-              </ul>
-            </div>
+            {related.length > 0 && (
+              <div className="card">
+                <h4 className="font-heading text-lg text-navy mb-3">Powiązane poradniki</h4>
+                <ul className="space-y-3 text-sm">
+                  {related.map((r) => (
+                    <li key={r.slug}>
+                      <Link
+                        href={`/poradnik/${r.slug}`}
+                        className="block text-navy/80 hover:text-accent-green group"
+                      >
+                        <span className="inline-flex items-start gap-1.5">
+                          <ArrowRight className="w-3 h-3 mt-1 text-accent-green/60 group-hover:translate-x-0.5 transition flex-shrink-0" />
+                          <span>{r.title}</span>
+                        </span>
+                        <span className="text-xs text-navy/50 ml-4.5 mt-0.5 block">
+                          {r.readingTime} min · {r.category}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </aside>
         </div>
       </div>

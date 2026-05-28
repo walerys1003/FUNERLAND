@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { Search, ArrowRight, Flame } from 'lucide-react';
 import { obituaries as seedObituaries } from '@/lib/data';
-import { obituaryStore } from '@/lib/marketplace/store';
+import { obituaryRepo } from '@/lib/marketplace/repo';
 
 export const dynamic = 'force-dynamic';
 
-export default function NekrologiPage() {
+export default async function NekrologiPage() {
   // Merge user-published obituaries with seed dataset
-  const published = obituaryStore.list();
+  const published = await obituaryRepo.list();
   const merged = [
     ...published.map((o) => ({
       slug: o.slug,

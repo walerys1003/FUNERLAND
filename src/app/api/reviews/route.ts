@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { reviewStore, bookingStore } from '@/lib/marketplace/store';
+import { reviewRepo, bookingRepo } from '@/lib/marketplace/repo';
+import { reviewStore } from '@/lib/marketplace/store';
+import { requireRole } from '@/lib/auth/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,8 +21,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const company = searchParams.get('company');
   if (!company) return NextResponse.json({ error: 'Brak parametru company' }, { status: 400 });
-  const reviews = reviewStore.forCompany(company);
-  const stats = reviewStore.averageForCompany(company);
+  const reviews = await reviewRepo.forCompany(company);
+  const stats = await reviewRepo.averageForCompany(company);
   return NextResponse.json({ company, reviews, stats });
 }
 
@@ -61,11 +63,11 @@ export async function POST(req: Request) {
     }
 
     // Verify booking number if provided
-    if (data.bookingNumber && !bookingStore.get(data.bookingNumber)) {
+    if (data.bookingNumber && !(await bookingRepo.get(data.bookingNumber))) {
       return NextResponse.json({ error: 'Nieprawidłowy numer rezerwacji' }, { status: 400 });
     }
 
-    const review = reviewStore.submit({
+    const review = await reviewRepo.submit({
       companySlug: data.companySlug,
       rating,
       title: String(data.title).trim(),
@@ -75,6 +77,7 @@ export async function POST(req: Request) {
       bookingNumber: data.bookingNumber,
     });
 
+    if (!review) return NextResponse.json({ error: 'Firma nie istnieje' }, { status: 404 });
     return NextResponse.json({
       ok: true,
       review,
@@ -88,8 +91,8 @@ export async function POST(req: Request) {
   }
 }
 
-// PATCH /api/reviews — company reply OR moderator approve
-//  body: { id, action:'reply'|'approve', body? }
+// PATCH /api/reviews — company reply OR moderator approve/reject
+//  body: { id, action:'reply'|'approve'|'reject', body? }
 export async function PATCH(req: Request) {
   try {
     const { id, action, body } = await req.json();
@@ -98,14 +101,23 @@ export async function PATCH(req: Request) {
       if (!body || body.length < 5 || body.length > 1500) {
         return NextResponse.json({ error: 'Odpowiedź 5–1500 znaków' }, { status: 400 });
       }
+      // reply still uses store (low-traffic, single-process — Supabase migration follows)
       const r = reviewStore.reply(id, body.trim());
       if (!r) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
       return NextResponse.json({ ok: true, review: r });
     }
     if (action === 'approve') {
-      const r = reviewStore.approve(id);
+      const admin = await requireRole(['admin']);
+      // In demo mode (no auth) we still allow approval
+      const r = await reviewRepo.approve(id);
       if (!r) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
-      return NextResponse.json({ ok: true, review: r });
+      return NextResponse.json({ ok: true, review: r, by: admin?.email || 'demo' });
+    }
+    if (action === 'reject') {
+      const admin = await requireRole(['admin']);
+      const r = await reviewRepo.reject(id);
+      if (!r) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
+      return NextResponse.json({ ok: true, review: r, by: admin?.email || 'demo' });
     }
     return NextResponse.json({ error: 'Nieznana akcja' }, { status: 400 });
   } catch (e) {

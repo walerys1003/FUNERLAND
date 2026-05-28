@@ -3,7 +3,7 @@ import {
   generateSlotsForRange,
   getSlotKindForCategory,
 } from '@/lib/marketplace/availability';
-import { bookingStore } from '@/lib/marketplace/store';
+import { bookingRepo } from '@/lib/marketplace/repo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   start.setHours(0, 0, 0, 0);
 
   const kind = getSlotKindForCategory(category);
-  const bookedSlotStarts = company ? bookingStore.bookedSlotsForCompany(company) : [];
+  const bookedSlotStarts = company ? await bookingRepo.bookedSlotsForCompany(company) : [];
   const range = generateSlotsForRange(start, days, kind, {
     companySlug: company,
     bookedSlotStarts,

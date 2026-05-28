@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { obituaryStore } from '@/lib/marketplace/store';
+import { obituaryRepo } from '@/lib/marketplace/repo';
 import CandleButton from '@/components/obituaries/candle-button';
 import { MapPin, Calendar, ArrowLeft } from 'lucide-react';
 
@@ -13,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const obit = obituaryStore.getBySlug(slug);
+  const obit = await obituaryRepo.getBySlug(slug);
   if (!obit) return { title: 'Nekrolog · Polskie Pogrzeby' };
   return {
     title: `${obit.personName} · Nekrolog · Polskie Pogrzeby`,
@@ -38,7 +38,7 @@ export default async function ObituaryDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const obit = obituaryStore.getBySlug(slug);
+  const obit = await obituaryRepo.getBySlug(slug);
   if (!obit) notFound();
 
   const isPremium = obit.tier === 'premium';

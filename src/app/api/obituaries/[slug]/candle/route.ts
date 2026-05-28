@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { obituaryStore } from '@/lib/marketplace/store';
+import { obituaryRepo } from '@/lib/marketplace/repo';
+import { createHash } from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,10 +11,9 @@ export async function POST(
   ctx: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await ctx.params;
-  const obit = obituaryStore.getBySlug(slug);
-  if (!obit) return NextResponse.json({ error: 'Nie znaleziono nekrologu' }, { status: 404 });
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-  const res = obituaryStore.lightCandle(obit.id, ip);
+  const ipHash = createHash('sha256').update(ip + (process.env.SALT || 'pp')).digest('hex');
+  const res = await obituaryRepo.lightCandle(slug, ipHash);
   if (!res) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
   if (!res.ok) {
     return NextResponse.json(

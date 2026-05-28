@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { messagingStore } from '@/lib/marketplace/store';
+import { messagingRepo } from '@/lib/marketplace/repo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,19 +11,19 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get('threadId');
   if (threadId) {
-    const messages = messagingStore.list(threadId);
+    const messages = await messagingRepo.listMessages(threadId);
     return NextResponse.json({ threadId, messages });
   }
   const role = searchParams.get('role');
   if (role === 'company') {
     const companySlug = searchParams.get('companySlug');
     if (!companySlug) return NextResponse.json({ error: 'Brak companySlug' }, { status: 400 });
-    return NextResponse.json({ threads: messagingStore.threadsForCompany(companySlug) });
+    return NextResponse.json({ threads: await messagingRepo.threadsForCompany(companySlug) });
   }
   if (role === 'customer') {
     const email = searchParams.get('email');
     if (!email) return NextResponse.json({ error: 'Brak email' }, { status: 400 });
-    return NextResponse.json({ threads: messagingStore.threadsForCustomer(email) });
+    return NextResponse.json({ threads: await messagingRepo.threadsForCustomer(email) });
   }
   return NextResponse.json({ error: 'Brak parametru role lub threadId' }, { status: 400 });
 }
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-      const t = messagingStore.ensureThread({
+      const t = await messagingRepo.ensureThread({
         companySlug: data.companySlug,
         customerEmail: data.customerEmail,
         customerName: data.customerName || 'Klient',
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     }
 
     const role = data.authorRole === 'company' ? 'company' : 'customer';
-    const msg = messagingStore.post(threadId!, {
+    const msg = await messagingRepo.post(threadId!, {
       authorRole: role,
       authorName: data.authorName || (role === 'company' ? 'Firma' : 'Klient'),
       body: data.body.trim(),
@@ -82,7 +82,7 @@ export async function PATCH(req: Request) {
     if (!threadId || !role || action !== 'markRead') {
       return NextResponse.json({ error: 'Niepoprawne dane' }, { status: 400 });
     }
-    messagingStore.markRead(threadId, role);
+    await messagingRepo.markRead(threadId, role);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: 'Wystąpił błąd' }, { status: 500 });

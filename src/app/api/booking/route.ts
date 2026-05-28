@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { bookingStore, leadStore, messagingStore } from '@/lib/marketplace/store';
+import { bookingRepo, leadRepo, messagingRepo } from '@/lib/marketplace/repo';
 import {
   getSlotKindForCategory,
   validateSlot,
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     if (body.slotStart) {
       const kind = getSlotKindForCategory(body.category);
       const bookedStarts = body.companySlug
-        ? bookingStore.bookedSlotsForCompany(body.companySlug)
+        ? await bookingRepo.bookedSlotsForCompany(body.companySlug)
         : [];
       const v = validateSlot(body.slotStart, kind, {
         companySlug: body.companySlug,
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     }
 
     const number = generateBookingNumber();
-    const booking = bookingStore.create({
+    const booking = await bookingRepo.create({
       number,
       category: body.category,
       companySlug: body.companySlug,
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
 
     // Create lead record(s)
     if (body.companySlug) {
-      leadStore.create({
+      await leadRepo.create({
         companySlug: body.companySlug,
         category: body.category,
         city: body.data.city,
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
       });
 
       // Open a messaging thread so the family can chat with the company
-      messagingStore.ensureThread({
+      await messagingRepo.ensureThread({
         companySlug: body.companySlug,
         customerEmail: body.data.email,
         customerName: body.data.name,
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
         .sort((a, b) => b.rating - a.rating)
         .slice(0, 3);
       for (const m of matches) {
-        leadStore.create({
+        await leadRepo.create({
           companySlug: m.slug,
           category: body.category,
           city: body.data.city,
@@ -187,7 +187,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const number = searchParams.get('number');
   if (!number) return NextResponse.json({ error: 'Brak numeru' }, { status: 400 });
-  const b = bookingStore.get(number);
+  const b = await bookingRepo.get(number);
   if (!b) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
   return NextResponse.json({
     number: b.number,

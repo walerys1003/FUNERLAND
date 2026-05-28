@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { leadStore } from '@/lib/marketplace/store';
+import { leadRepo } from '@/lib/marketplace/repo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,15 +10,15 @@ export async function GET(req: Request) {
   const company = searchParams.get('company');
   const status = searchParams.get('status');
   if (!company) return NextResponse.json({ error: 'Brak parametru company' }, { status: 400 });
-  let leads = leadStore.forCompany(company);
-  if (status) leads = leads.filter((l) => l.status === status);
+  const all = await leadRepo.forCompany(company);
+  const leads = status ? all.filter((l) => l.status === status) : all;
   return NextResponse.json({
     company,
     counts: {
-      new: leadStore.forCompany(company).filter((l) => l.status === 'new').length,
-      contacted: leadStore.forCompany(company).filter((l) => l.status === 'contacted').length,
-      won: leadStore.forCompany(company).filter((l) => l.status === 'won').length,
-      lost: leadStore.forCompany(company).filter((l) => l.status === 'lost').length,
+      new: all.filter((l) => l.status === 'new').length,
+      contacted: all.filter((l) => l.status === 'contacted').length,
+      won: all.filter((l) => l.status === 'won').length,
+      lost: all.filter((l) => l.status === 'lost').length,
     },
     leads,
   });
@@ -30,7 +30,7 @@ export async function PATCH(req: Request) {
   if (!id || !status) return NextResponse.json({ error: 'Niepoprawne dane' }, { status: 400 });
   const allowed = ['new', 'contacted', 'won', 'lost'];
   if (!allowed.includes(status)) return NextResponse.json({ error: 'Niepoprawny status' }, { status: 400 });
-  const l = leadStore.updateStatus(id, status);
+  const l = await leadRepo.updateStatus(id, status);
   if (!l) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
   return NextResponse.json({ ok: true, lead: l });
 }

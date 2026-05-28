@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { bookingStore } from '@/lib/marketplace/store';
+import { bookingRepo } from '@/lib/marketplace/repo';
 import { CheckCircle2, Calendar, Phone, Mail, MessageCircle, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +31,7 @@ export default async function ConfirmationPage({
   params: Promise<{ number: string }>;
 }) {
   const { number } = await params;
-  const b = bookingStore.get(number);
+  const b = await bookingRepo.get(number);
   if (!b) notFound();
 
   return (

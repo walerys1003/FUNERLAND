@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { obituaryStore } from '@/lib/marketplace/store';
+import { obituaryRepo } from '@/lib/marketplace/repo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const city = searchParams.get('city') || undefined;
   const tier = (searchParams.get('tier') as 'free' | 'premium' | null) || undefined;
-  const list = obituaryStore.list({ city, tier });
+  const list = await obituaryRepo.list({ city, tier });
   return NextResponse.json({ count: list.length, items: list });
 }
 
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     if (!data.rodo) {
       return NextResponse.json({ error: 'Wymagana zgoda RODO' }, { status: 400 });
     }
-    const obit = obituaryStore.publish({
+    const obit = await obituaryRepo.publish({
       personName: String(data.personName).slice(0, 120),
       birthDate: data.birthDate,
       deathDate: data.deathDate,

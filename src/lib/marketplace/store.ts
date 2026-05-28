@@ -155,6 +155,12 @@ export const leadStore = {
   forCompany(companySlug: string) {
     return store.list(store.leads, (l) => l.companySlug === companySlug);
   },
+  recent(limit = 20) {
+    return store
+      .list(store.leads)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  },
   get(id: string) {
     return store.leads.get(id);
   },
@@ -256,6 +262,18 @@ export const reviewStore = {
       store.reviews,
       (r) => r.companySlug === companySlug && (includePending || r.status === 'published'),
     );
+  },
+  pending(limit = 20) {
+    return store
+      .list(store.reviews, (r) => r.status === 'pending')
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  },
+  recent(limit = 20) {
+    return store
+      .list(store.reviews)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
   },
   get(id: string) {
     return store.reviews.get(id);

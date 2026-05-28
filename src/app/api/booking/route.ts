@@ -1,4 +1,10 @@
 import { NextResponse } from 'next/server';
+import { bookingStore, leadStore, messagingStore } from '@/lib/marketplace/store';
+import {
+  getSlotKindForCategory,
+  validateSlot,
+} from '@/lib/marketplace/availability';
+import { companies } from '@/lib/data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,11 +13,13 @@ type BookingRequest = {
   category: string;
   companySlug?: string;
   companyName?: string;
+  slotStart?: string;
+  slotEnd?: string;
   data: Record<string, any>;
   submittedAt: string;
 };
 
-// Same rate limiting as /api/ai/chat but stricter (booking = high-value)
+// Rate limit (in-memory; replace with Upstash in production)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 5;
 const RATE_WINDOW = 60 * 1000;
@@ -35,11 +43,9 @@ function validate(body: BookingRequest): { ok: boolean; error?: string } {
   if (!body.data.phone) return { ok: false, error: 'Telefon jest wymagany' };
   if (!body.data.email) return { ok: false, error: 'E-mail jest wymagany' };
   if (!body.data.rodo) return { ok: false, error: 'Wymagana jest zgoda RODO' };
-  // Email check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.data.email)) {
     return { ok: false, error: 'Nieprawidłowy format e-mail' };
   }
-  // Phone check (PL +48 or 9 digits)
   const phoneClean = body.data.phone.replace(/\D/g, '');
   if (phoneClean.length < 9 || phoneClean.length > 11) {
     return { ok: false, error: 'Nieprawidłowy numer telefonu' };
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
     if (!checkRateLimit(ip)) {
       return NextResponse.json(
         { error: 'Zbyt wiele zgłoszeń. Spróbuj proszę za chwilę.' },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -69,40 +75,133 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const bookingNumber = generateBookingNumber();
+    // If a slot was selected, verify it against availability rules
+    if (body.slotStart) {
+      const kind = getSlotKindForCategory(body.category);
+      const bookedStarts = body.companySlug
+        ? bookingStore.bookedSlotsForCompany(body.companySlug)
+        : [];
+      const v = validateSlot(body.slotStart, kind, {
+        companySlug: body.companySlug,
+        bookedSlotStarts: bookedStarts,
+      });
+      if (!v.ok) {
+        return NextResponse.json({ error: v.reason }, { status: 409 });
+      }
+    }
 
-    // TODO: persist to Supabase
-    // await supabaseAdmin.from('bookings').insert({
-    //   number: bookingNumber,
-    //   category: body.category,
-    //   company_slug: body.companySlug,
-    //   payload: body.data,
-    //   submitted_at: body.submittedAt,
-    //   ip,
-    //   status: 'new',
-    // });
+    const number = generateBookingNumber();
+    const booking = bookingStore.create({
+      number,
+      category: body.category,
+      companySlug: body.companySlug,
+      companyName: body.companyName,
+      slotStart: body.slotStart,
+      slotEnd: body.slotEnd,
+      data: body.data,
+      ip,
+    });
 
-    // TODO: send notification email to user
-    // await sendEmail({
-    //   to: body.data.email,
-    //   template: 'booking-confirmation',
-    //   data: { bookingNumber, category: body.category, ... }
-    // });
+    // Create lead record(s)
+    if (body.companySlug) {
+      leadStore.create({
+        companySlug: body.companySlug,
+        category: body.category,
+        city: body.data.city,
+        name: body.data.name,
+        email: body.data.email,
+        phone: body.data.phone,
+        message: body.data.notes,
+        source: 'booking',
+        bookingNumber: number,
+      });
 
-    // TODO: route to companies (if no specific company chosen → top 3 match)
+      // Open a messaging thread so the family can chat with the company
+      messagingStore.ensureThread({
+        companySlug: body.companySlug,
+        customerEmail: body.data.email,
+        customerName: body.data.name,
+        subject: `Rezerwacja ${number}`,
+        bookingNumber: number,
+      });
+    } else {
+      // No specific company → distribute to top-3 matches in the same city/category
+      const cityMatch = (c: any) =>
+        !body.data.city ||
+        (c.city || '').toLowerCase().includes(body.data.city.toLowerCase());
+      const cats: Record<string, string> = {
+        'zaklady-pogrzebowe': 'pogrzeby',
+        krematoria: 'kremacja',
+        'kwiaciarnie-pogrzebowe': 'kwiaciarnie',
+        kamieniarze: 'kamieniarze',
+        transport: 'transport',
+      };
+      const targetCat = cats[body.category];
+      const matches = companies
+        .filter((c) => cityMatch(c) && (!targetCat || c.category === targetCat))
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3);
+      for (const m of matches) {
+        leadStore.create({
+          companySlug: m.slug,
+          category: body.category,
+          city: body.data.city,
+          name: body.data.name,
+          email: body.data.email,
+          phone: body.data.phone,
+          message: body.data.notes,
+          source: 'booking',
+          bookingNumber: number,
+        });
+      }
+    }
 
-    console.log(`[booking] ${bookingNumber} | ${body.category} | ${body.data.email}`);
+    // TODO: send confirmation email via Resend
+    // TODO: send SMS via SMSAPI.pl
+    console.log(`[booking] ${number} | ${body.category} | ${body.data.email}`);
 
     return NextResponse.json({
       ok: true,
-      bookingNumber,
+      bookingNumber: number,
+      booking: {
+        number: booking.number,
+        category: booking.category,
+        companySlug: booking.companySlug,
+        slotStart: booking.slotStart,
+        slotEnd: booking.slotEnd,
+        status: booking.status,
+      },
       message: 'Zgłoszenie przyjęte. Skontaktujemy się w ciągu 2 godzin.',
     });
   } catch (e: any) {
     console.error('Booking error:', e);
     return NextResponse.json(
       { error: 'Wystąpił błąd. Spróbuj proszę ponownie.' },
-      { status: 500 }
+      { status: 500 },
     );
   }
+}
+
+// GET /api/booking?number=PP-... → return booking summary
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const number = searchParams.get('number');
+  if (!number) return NextResponse.json({ error: 'Brak numeru' }, { status: 400 });
+  const b = bookingStore.get(number);
+  if (!b) return NextResponse.json({ error: 'Nie znaleziono' }, { status: 404 });
+  return NextResponse.json({
+    number: b.number,
+    category: b.category,
+    companySlug: b.companySlug,
+    companyName: b.companyName,
+    slotStart: b.slotStart,
+    slotEnd: b.slotEnd,
+    status: b.status,
+    createdAt: b.createdAt,
+    contact: {
+      name: b.data.name,
+      email: b.data.email,
+      phone: b.data.phone,
+    },
+  });
 }

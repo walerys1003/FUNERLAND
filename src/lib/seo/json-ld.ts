@@ -213,7 +213,165 @@ export function reviewJsonLd(opts: {
   };
 }
 
+// ===================== HowTo =====================
+export type HowToStep = {
+  name: string;
+  text: string;
+  url?: string;
+  image?: string;
+};
+
+export function howToJsonLd(opts: {
+  name: string;
+  description: string;
+  steps: HowToStep[];
+  totalTime?: string; // ISO 8601 duration e.g. "PT5M"
+  estimatedCost?: { value: number; currency?: string };
+  supply?: string[];
+  tool?: string[];
+  url?: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: opts.name,
+    description: opts.description,
+    totalTime: opts.totalTime,
+    estimatedCost: opts.estimatedCost
+      ? {
+          '@type': 'MonetaryAmount',
+          currency: opts.estimatedCost.currency || 'PLN',
+          value: opts.estimatedCost.value,
+        }
+      : undefined,
+    supply: opts.supply?.map((s) => ({ '@type': 'HowToSupply', name: s })),
+    tool: opts.tool?.map((t) => ({ '@type': 'HowToTool', name: t })),
+    step: opts.steps.map((s, i) => ({
+      '@type': 'HowToStep',
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+      url: s.url ? (s.url.startsWith('http') ? s.url : `${BASE_URL}${s.url}`) : undefined,
+      image: s.image,
+    })),
+    inLanguage: 'pl-PL',
+    url: opts.url ? (opts.url.startsWith('http') ? opts.url : `${BASE_URL}${opts.url}`) : undefined,
+  };
+}
+
+// ===================== SoftwareApplication (calculators) =====================
+export function softwareApplicationJsonLd(opts: {
+  name: string;
+  description: string;
+  url: string;
+  applicationCategory?: string;
+  rating?: { value: number; count: number };
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: opts.name,
+    description: opts.description,
+    url: opts.url.startsWith('http') ? opts.url : `${BASE_URL}${opts.url}`,
+    applicationCategory: opts.applicationCategory || 'UtilityApplication',
+    operatingSystem: 'Any',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'PLN',
+    },
+    inLanguage: 'pl-PL',
+    publisher: {
+      '@type': 'Organization',
+      name: BRAND_NAME,
+      url: BASE_URL,
+    },
+    aggregateRating: opts.rating
+      ? {
+          '@type': 'AggregateRating',
+          ratingValue: opts.rating.value,
+          ratingCount: opts.rating.count,
+          bestRating: 5,
+        }
+      : undefined,
+  };
+}
+
+// ===================== WebPage (generic) =====================
+export function webPageJsonLd(opts: {
+  name: string;
+  description: string;
+  url: string;
+  datePublished?: string;
+  dateModified?: string;
+  breadcrumb?: Crumb[];
+  primaryImage?: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: opts.name,
+    description: opts.description,
+    url: opts.url.startsWith('http') ? opts.url : `${BASE_URL}${opts.url}`,
+    inLanguage: 'pl-PL',
+    isPartOf: { '@type': 'WebSite', name: BRAND_NAME, url: BASE_URL },
+    datePublished: opts.datePublished,
+    dateModified: opts.dateModified,
+    primaryImageOfPage: opts.primaryImage
+      ? { '@type': 'ImageObject', url: opts.primaryImage }
+      : undefined,
+    breadcrumb: opts.breadcrumb ? breadcrumbJsonLd(opts.breadcrumb) : undefined,
+  };
+}
+
+// ===================== Place (city landing) =====================
+export function placeJsonLd(opts: {
+  name: string;
+  region: string;
+  description?: string;
+  populationCount?: number;
+  url: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Place',
+    name: opts.name,
+    description: opts.description,
+    url: opts.url.startsWith('http') ? opts.url : `${BASE_URL}${opts.url}`,
+    containedInPlace: { '@type': 'AdministrativeArea', name: opts.region },
+    additionalProperty: opts.populationCount
+      ? { '@type': 'PropertyValue', name: 'population', value: opts.populationCount }
+      : undefined,
+  };
+}
+
+// ===================== ItemList (collection pages) =====================
+export function itemListJsonLd(opts: {
+  name: string;
+  items: Array<{ name: string; url: string; description?: string }>;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: opts.name,
+    numberOfItems: opts.items.length,
+    itemListElement: opts.items.map((it, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: it.name,
+      url: it.url.startsWith('http') ? it.url : `${BASE_URL}${it.url}`,
+      description: it.description,
+    })),
+  };
+}
+
 // ===================== Helper: render JSON-LD script tag content =====================
 export function jsonLdScript(data: any): string {
   return JSON.stringify(data, (_, v) => (v === undefined ? undefined : v));
+}
+
+/** Combined <script> renderer — accepts one or many JSON-LD objects. */
+export function combineJsonLd(...items: any[]) {
+  if (items.length === 1) return items[0];
+  return items.filter(Boolean);
 }

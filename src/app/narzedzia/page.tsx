@@ -11,6 +11,14 @@ import {
   ArrowRight,
   Sparkles,
 } from 'lucide-react';
+import Breadcrumbs from '@/components/seo/breadcrumbs';
+import JsonLd from '@/components/seo/json-ld';
+import {
+  webPageJsonLd,
+  itemListJsonLd,
+  faqJsonLd,
+  combineJsonLd,
+} from '@/lib/seo/json-ld';
 
 export const metadata: Metadata = {
   title: 'Narzędzia i kalkulatory pogrzebowe | PolskiePogrzeby.pl',
@@ -88,11 +96,40 @@ const tools = [
 ];
 
 export default function ToolsHubPage() {
+  const jsonLd = combineJsonLd(
+    webPageJsonLd({
+      name: 'Narzędzia i kalkulatory pogrzebowe',
+      description:
+        'Bezpłatne kalkulatory i narzędzia: koszt pogrzebu, zasiłek ZUS, kredyt, porównanie ofert, checklisty formalności.',
+      url: '/narzedzia',
+      breadcrumb: [
+        { name: 'Strona główna', url: '/' },
+        { name: 'Narzędzia', url: '/narzedzia' },
+      ],
+    }),
+    itemListJsonLd({
+      name: 'Narzędzia PolskiePogrzeby.pl',
+      items: tools.map((t) => ({
+        name: t.title,
+        url: t.href,
+        description: t.description,
+      })),
+    }),
+    faqJsonLd(
+      FAQ.map((f) => ({ question: f.q, answer: f.a })),
+    ),
+  );
+
   return (
     <div className="bg-cream min-h-[calc(100vh-68px)]">
+      <JsonLd data={jsonLd} />
       {/* Hero */}
       <section className="bg-navy text-white py-14 md:py-20">
         <div className="container-page">
+          <Breadcrumbs
+            items={[{ name: 'Narzędzia', url: '/narzedzia' }]}
+            className="mb-4 !text-white/70 [&_a:hover]:!text-white [&_[aria-current=page]]:!text-white"
+          />
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 text-[12px] uppercase tracking-wider text-white/70 mb-3">
               <Sparkles className="w-3.5 h-3.5" />
